@@ -21,13 +21,26 @@ import { getSettings } from './src/state.js';
 
 const EXT_NAME = 'Roulette';
 
-export async function init() {
-    console.log(`[${EXT_NAME}] init()`);
-    // Materialise settings block early so subsequent reads always see defaults.
-    getSettings();
+console.log(`[${EXT_NAME}] module loaded`);
 
-    registerEventListeners();
-    registerSlashCommands();
-    mountSettingsPanel();
-    mountStatusIndicator();
+export async function init() {
+    console.log(`[${EXT_NAME}] init() called`);
+    try {
+        getSettings();
+        registerEventListeners();
+        console.log(`[${EXT_NAME}] event listeners registered`);
+        registerSlashCommands();
+        console.log(`[${EXT_NAME}] slash commands registered`);
+        mountSettingsPanel();
+        console.log(`[${EXT_NAME}] settings panel mounted`);
+        mountStatusIndicator();
+        console.log(`[${EXT_NAME}] status indicator mounted`);
+        console.log(`[${EXT_NAME}] init() complete`);
+    } catch (err) {
+        console.error(`[${EXT_NAME}] init() failed:`, err);
+        if (typeof toastr !== 'undefined') {
+            toastr.error(`Roulette init failed: ${err?.message ?? err}`);
+        }
+        throw err;
+    }
 }
