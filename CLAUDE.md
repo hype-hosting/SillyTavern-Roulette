@@ -23,23 +23,29 @@ Because the unit of rotation is the **connection profile**, the extension does n
 The extension is a thin scheduler layered on top of SillyTavern's existing Connection Manager. It does not reimplement provider switching, parameter handling, or model selection. It listens to chat events, decides when to advance the rotation, and triggers `/profile <name>` to switch.
 
 ### Hook points (SillyTavern event system)
-Use `eventSource.on(event_types.X, handler)` for all of these. Import `eventSource` and `event_types` from `../../../../script.js` (standard ST extension pattern — confirm exact relative path during scaffolding).
+Use `eventSource.on(event_types.X, handler)` for all of these. Import `eventSource` and `event_types` from `../../../../script.js` (verified — see "Verified ST internals" below).
 
-- `MESSAGE_RECEIVED` or `GENERATION_ENDED` — primary trigger for advancing the response counter. Use whichever fires reliably *after* a successful AI response and is *not* fired on swipes. Verify behavior during implementation; if neither is clean, fall back to `CHARACTER_MESSAGE_RENDERED`.
-- `MESSAGE_SWIPED` — explicitly **does not** advance the counter. Swipes are retries within the same slot.
-- `GENERATION_STARTED` — the moment to fire the profile switch *before* the next generation, if the rotation says it's time to switch. This is critical: we switch profiles *before* the model generates, not after.
-- `CHAT_CHANGED` — reload per-chat rotation state when the user switches chats.
-- `CONNECTION_PROFILE_LOADED` — to detect when the user manually switches profiles mid-rotation (see "Manual override behavior" below).
+- `MESSAGE_RECEIVED` — primary trigger for advancing the response counter. **Emitted with `(messageId, type)`** where `type` is one of `'swipe'`, `'continue'`, `'append'`, `'appendFinal'`, `'regenerate'`, `'impersonate'`, `'quiet'`, `'first_message'`, or `undefined` for a normal generation. **Advance the counter only when `type` is undefined/normal.** Filtering on `type` is what makes swipes, regens, continues, and impersonations not consume rotation slots — there is no other event-level guard.
+- `GENERATION_STARTED` — emitted with `(type, options, dryRun)`. The moment to fire the profile switch *before* the next generation, if the rotation says it's time to switch. **Skip when `dryRun === true`** (ST emits this for prompt-token-counting and similar dry runs) and skip non-normal `type` values (same set as above). This is critical: we switch profiles *before* the model generates, not after.
+- `MESSAGE_SWIPED` — fires when the user navigates between **existing** swipes via the left/right arrows; not on swipe-regeneration. Largely irrelevant to the scheduler since the `type` filter on `MESSAGE_RECEIVED`/`GENERATION_STARTED` already handles regen-swipes.
+- `CHAT_CHANGED` — emitted as `'chat_id_changed'`. Reload per-chat rotation state when the user switches chats.
+- `CONNECTION_PROFILE_LOADED` — fires for **both** manual user switches *and* our own programmatic `/profile` calls (verified: see "Verified ST internals"). The handler must consult an internal `isInternalSwitch` flag we set immediately before firing `/profile` and clear inside the handler — otherwise we trip our own manual-override path on every rotation.
+
+**Generation type strings** (for the filter logic in `rotation.js`):
+- Advance counter / fire switch: `undefined` (normal user generation).
+- Ignore: `'swipe'`, `'regenerate'`, `'continue'`, `'append'`, `'appendFinal'`, `'impersonate'`, `'quiet'`, `'first_message'`, plus any `dryRun === true`.
 
 ### Profile switching mechanism
-Use SillyTavern's slash command system to switch profiles:
+Use SillyTavern's slash command system to switch profiles. The `/profile` command is registered by the built-in Connection Profiles extension and accepts an `await=true` named arg that resolves only after `CONNECTION_PROFILE_LOADED` and an online-status check — use it so the switch is synchronous from our perspective:
 
 ```js
 import { executeSlashCommandsWithOptions } from '../../../../scripts/slash-commands.js';
-await executeSlashCommandsWithOptions(`/profile ${profileName}`, { showOutput: false });
+// Set isInternalSwitch = true here, then:
+await executeSlashCommandsWithOptions(`/profile await=true ${profileName}`, { showOutput: false });
+// CONNECTION_PROFILE_LOADED handler will fire during this await; it must check the flag and bail.
 ```
 
-(Confirm exact import path at scaffold time. The slash command interface is the supported public API for profile switching.)
+`/profile` does fuzzy matching by name via Fuse.js, so an exact-name validation pass against `extension_settings.connectionManager.profiles` is required *before* firing — otherwise a typo'd slot may silently switch to an unrelated profile.
 
 ### State storage
 - **Global settings** (rotation queues the user has defined, default rotation, UI preferences) → `extension_settings.roulette` (persisted via `saveSettingsDebounced()`).
@@ -245,18 +251,38 @@ SillyTavern-Roulette/
   "author": "Hyperion Blackthorne",
   "version": "0.1.0",
   "homePage": "https://github.com/<user>/SillyTavern-Roulette",
-  "auto_update": true
+  "auto_update": true,
+  "hooks": { "activate": "init" }
 }
 ```
 
-(Confirm latest manifest schema fields against ST docs at scaffold time.)
+`hooks.activate` names an exported function in `index.js` that ST calls on activation (every bundled extension uses `init`). With it, `index.js` should `export async function init() { ... }`. Without it, ST still imports the module and runs top-level code, but using the hook gives us a clean activation point that runs *after* core ST is ready.
 
 ---
 
 ## Implementation notes
 
+### Verified import paths (third-party extension at `public/scripts/extensions/third-party/SillyTavern-Roulette/`)
+
+| Symbol | Path |
+|---|---|
+| `eventSource`, `event_types`, `saveSettingsDebounced`, `chat_metadata` | `../../../../script.js` |
+| `extension_settings`, `saveMetadataDebounced`, `getContext`, `renderExtensionTemplateAsync` | `../../../../scripts/extensions.js` |
+| `executeSlashCommandsWithOptions` | `../../../../scripts/slash-commands.js` |
+| `SlashCommandParser` | `../../../../scripts/slash-commands/SlashCommandParser.js` |
+| `SlashCommand` (use `SlashCommand.fromProps({...})`) | `../../../../scripts/slash-commands/SlashCommand.js` |
+| `SlashCommandArgument`, `SlashCommandNamedArgument`, `ARGUMENT_TYPE` | `../../../../scripts/slash-commands/SlashCommandArgument.js` |
+| `Popup`, `callGenericPopup`, `POPUP_TYPE`, `POPUP_RESULT` | `../../../../scripts/popup.js` |
+
+The `../../../../` depth assumes the canonical install location (`public/scripts/extensions/third-party/<ext>/index.js`). Built-in extensions live one directory shallower and use `../../../`; we are not built-in.
+
 ### Connection profile enumeration
-ST stores connection profiles in `extension_settings.connectionManager.profiles` (verify path during scaffold). The queue editor's profile dropdown should read from the same source the native ST profile selector uses, and refresh on `CONNECTION_PROFILE_LOADED` and on modal open. **Do not cache** the profile list — the user may add/remove profiles between sessions.
+ST stores connection profiles in `extension_settings.connectionManager.profiles` (verified — `public/scripts/extensions.js:172`). Each profile is a `ConnectionProfile` with at least `id` and `name` (full JSDoc at `public/scripts/extensions/connection-manager/index.js:159`). The currently selected profile is tracked as an **id** at `extension_settings.connectionManager.selectedProfile`, *not* a name — convert when comparing.
+
+The queue editor's profile dropdown should read from this list directly and refresh on `CONNECTION_PROFILE_LOADED`, `CONNECTION_PROFILE_CREATED`, `CONNECTION_PROFILE_DELETED`, `CONNECTION_PROFILE_UPDATED`, and on modal open. **Do not cache** the profile list — the user may add/remove profiles between sessions.
+
+### Modals — use ST's `Popup` class
+Use the `Popup` class from `../../../../scripts/popup.js` for the queue editor instead of rolling our own modal. It handles z-index, focus trap, escape-to-cancel, and theme-correct styling automatically. `POPUP_TYPE.TEXT` for content-driven popups, `POPUP_RESULT` for return-value comparison. The convenience function `callGenericPopup(content, type, inputValue, popupOptions)` is fine for simple cases; reserve the `new Popup(...)` constructor for the queue editor where we need custom buttons and form state.
 
 ### Concurrency / race conditions
 The flow `MESSAGE_RECEIVED → decrement → flag pending switch → GENERATION_STARTED → switch → generate` has a potential race: what if the user hits Generate again very quickly, or two generations are queued? Profile switches via slash command are async. Strategies:
@@ -285,8 +311,8 @@ The extension is "done" for v1 when all of the following are true on a fresh ST 
 2. The Roulette panel appears in the Extensions drawer.
 3. A user with at least 2 connection profiles can create a queue, save it, and activate it on a chat.
 4. In **sequential** mode with fixed counts (e.g. A=3, B=2, C=4), generating 9 messages causes the active profile to be A for the first 3, B for the next 2, C for the next 4. Verified by checking the connection profile selector value before each generation.
-5. Swiping a message does not advance the counter.
-6. Regenerating a message does not advance the counter.
+5. Swiping a message (regenerate-as-swipe) does not advance the counter — verified via the `type === 'swipe'` filter on `MESSAGE_RECEIVED`.
+6. Regenerating a message does not advance the counter — verified via the `type === 'regenerate'` filter on `MESSAGE_RECEIVED`.
 7. In **weighted-random** mode with weights 1/1/1 and run length 1, profiles switch every message and over 100 messages each profile is used roughly evenly (within reasonable variance).
 8. With `noRepeatInRow: true`, no two consecutive responses ever come from the same profile (verified over 50+ messages).
 9. Switching chats preserves each chat's independent rotation state.
@@ -299,16 +325,18 @@ The extension is "done" for v1 when all of the following are true on a fresh ST 
 
 ---
 
-## Things to confirm at scaffold time (do not guess — check ST source)
+## Verified ST internals
 
-These were inferred from general ST extension patterns. **Before writing code, open the SillyTavern repo and verify:**
+Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR #5591). All paths and identifiers below are quoted from that revision; re-verify if upgrading to a much newer ST.
 
-1. Exact relative import paths for `eventSource`, `event_types`, `extension_settings`, `saveSettingsDebounced`, `chat_metadata`, `saveMetadataDebounced`, `executeSlashCommandsWithOptions`, `SlashCommandParser`. The `../../../../` depth assumes the standard `public/scripts/extensions/third-party/<ext>/` install location — confirm.
-2. Exact event name strings in `event_types` for: message received, generation started, generation ended, message swiped, chat changed, connection profile loaded. These have been renamed across ST versions.
-3. Where connection profiles live in state and the canonical way to enumerate them.
-4. Whether `CONNECTION_PROFILE_LOADED` fires for programmatic switches (ours) as well as manual ones — if yes, we need to flag our own switches to avoid the manual-override path triggering on our own switches.
-5. The exact `manifest.json` schema for the current ST version.
-6. Whether ST has a recommended popup/modal helper (e.g. `callPopup`, `Popup` class) we should use instead of rolling our own modal.
+1. **Import paths** — see the table in "Verified import paths" under Implementation notes. `../../../../` is the correct depth for third-party extensions.
+2. **Event name strings** — all confirmed in `public/scripts/events.js`:
+   `MESSAGE_RECEIVED='message_received'` · `MESSAGE_SWIPED='message_swiped'` · `GENERATION_STARTED='generation_started'` · `GENERATION_ENDED='generation_ended'` · `CHAT_CHANGED='chat_id_changed'` · `CONNECTION_PROFILE_LOADED='connection_profile_loaded'` · `CHARACTER_MESSAGE_RENDERED='character_message_rendered'`.
+   `MESSAGE_RECEIVED` and `GENERATION_STARTED` carry generation-`type` payload args — see "Hook points" above for the full type-string list and filter rules.
+3. **Connection profiles in state** — `extension_settings.connectionManager.profiles` (array of `{id, name, ...}`); selected id at `extension_settings.connectionManager.selectedProfile`. ConnectionProfile JSDoc at `public/scripts/extensions/connection-manager/index.js:159-182`.
+4. **`CONNECTION_PROFILE_LOADED` and our own switches** — confirmed: yes, the event fires for our `/profile` calls too (the change-handler at `public/scripts/extensions/connection-manager/index.js:752` emits unconditionally). We must use an `isInternalSwitch` flag.
+5. **Manifest schema** — fields ST honors: `display_name`, `loading_order`, `requires`, `optional`, `js`, `css`, `author`, `version`, `homePage` (camelCase), `auto_update`, `hooks` (`{activate: 'init'}` convention), plus optional `i18n` and `generate_interceptor`. All bundled extensions use `hooks.activate = 'init'` and we will too.
+6. **Popup helper** — yes: `Popup` class at `public/scripts/popup.js:148`, `callGenericPopup` at line 909, `POPUP_TYPE`/`POPUP_RESULT` enums. Use these instead of rolling a custom modal.
 
 ---
 
