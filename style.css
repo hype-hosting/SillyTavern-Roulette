@@ -1,10 +1,233 @@
 /*
  * SillyTavern-Roulette — AGPL-3.0
- * All extension styles must be scoped under .roulette-extension.
- * Use ST CSS variables (--SmartThemeBodyColor, --SmartThemeBlurTintColor,
- * --SmartThemeBorderColor, etc.) — never hardcode colors.
+ * All rules scoped under .roulette-extension. Colors / borders use ST CSS
+ * variables so light/dark themes work without overrides.
  */
 
-.roulette-extension {
-    /* Stub — populated as UI lands. */
+.roulette-extension .hidden { display: none !important; }
+
+/* ---------- Settings panel ---------- */
+
+.roulette-settings-block {
+    margin-bottom: 0.5rem;
+}
+
+.roulette-settings-block .roulette-status {
+    padding: 0.4rem 0.6rem;
+    margin: 0.5rem 0;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    font-size: 0.95em;
+}
+
+.roulette-settings-block .roulette-row-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0.4rem 0;
+}
+
+.roulette-settings-block .roulette-section-title {
+    font-weight: 600;
+    margin: 0.7rem 0 0.3rem;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.85;
+}
+
+.roulette-settings-block .roulette-queues {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.roulette-settings-block .roulette-queue-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+}
+
+.roulette-queue-name {
+    font-weight: 600;
+    color: var(--SmartThemeBodyColor);
+}
+
+.roulette-queue-meta {
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+
+.roulette-queue-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.roulette-empty {
+    padding: 0.6rem;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* ---------- Queue editor modal ---------- */
+
+.roulette-queue-editor .roulette-modal-title {
+    margin: 0 0 0.6rem;
+    color: var(--SmartThemeBodyColor);
+}
+
+.roulette-queue-editor .roulette-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 460px;
+}
+
+.roulette-queue-editor .roulette-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.roulette-queue-editor .roulette-field-inline {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.roulette-queue-editor .roulette-section-title {
+    font-weight: 600;
+    margin: 0.5rem 0 0.2rem;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.85;
+}
+
+.roulette-queue-editor .roulette-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.roulette-slot-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    flex-wrap: wrap;
+}
+
+.roulette-slot-num {
+    font-weight: 600;
+    opacity: 0.7;
+    min-width: 1.4em;
+}
+
+.roulette-slot-profile {
+    flex: 1 1 200px;
+    min-width: 160px;
+}
+
+.roulette-slot-narrow {
+    width: 5.5em;
+    flex: 0 0 auto;
+}
+
+.roulette-range-fields {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.roulette-slot-actions {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+.roulette-weighted-footer {
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    padding-top: 0.5rem;
+    margin-top: 0.4rem;
+}
+
+.roulette-row-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ---------- Status pill / popover ---------- */
+
+.roulette-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    margin: 0 0.25rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 999px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85em;
+    line-height: 1;
+    max-width: 22em;
+    overflow: hidden;
+}
+
+.roulette-pill:hover,
+.roulette-pill:focus-visible {
+    outline: 1px solid var(--SmartThemeBodyColor);
+}
+
+.roulette-pill-off {
+    opacity: 0.55;
+}
+
+.roulette-pill-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roulette-popover {
+    background: var(--SmartThemeBlurTintColor);
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    padding: 0.6rem;
+    min-width: 220px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    color: var(--SmartThemeBodyColor);
+    font-size: 0.9em;
+}
+
+.roulette-popover-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.roulette-popover-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.roulette-warn {
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.85;
+    font-style: italic;
 }
