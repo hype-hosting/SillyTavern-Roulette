@@ -5,7 +5,7 @@
  * slots reorder via Up/Down buttons (drag-to-reorder is v2).
  */
 
-import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../scripts/popup.js';
+import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup.js';
 import { listProfileNames } from '../profileSwitcher.js';
 import { upsertQueue } from '../state.js';
 import { validateQueue } from '../rotation.js';

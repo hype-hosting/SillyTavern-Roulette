@@ -274,7 +274,7 @@ SillyTavern-Roulette/
 | `SlashCommandArgument`, `SlashCommandNamedArgument`, `ARGUMENT_TYPE` | `../../../../scripts/slash-commands/SlashCommandArgument.js` |
 | `Popup`, `callGenericPopup`, `POPUP_TYPE`, `POPUP_RESULT` | `../../../../scripts/popup.js` |
 
-The `../../../../` depth assumes the canonical install location (`public/scripts/extensions/third-party/<ext>/index.js`). Built-in extensions live one directory shallower and use `../../../`; we are not built-in.
+The `../../../../` depth in the table above is for **`index.js` at the extension root**. Files nested deeper need one extra `../` per level: `src/*.js` use `../../../../../`, `src/ui/*.js` use `../../../../../../`. Verified against canonical install location `public/scripts/extensions/third-party/<ext>/`. Built-in extensions live one directory shallower and use one fewer `../`; we are not built-in.
 
 ### Connection profile enumeration
 ST stores connection profiles in `extension_settings.connectionManager.profiles` (verified — `public/scripts/extensions.js:172`). Each profile is a `ConnectionProfile` with at least `id` and `name` (full JSDoc at `public/scripts/extensions/connection-manager/index.js:159`). The currently selected profile is tracked as an **id** at `extension_settings.connectionManager.selectedProfile`, *not* a name — convert when comparing.
