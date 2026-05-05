@@ -1,0 +1,10 @@
+/*
+ * SillyTavern-Roulette — AGPL-3.0
+ * All extension styles must be scoped under .roulette-extension.
+ * Use ST CSS variables (--SmartThemeBodyColor, --SmartThemeBlurTintColor,
+ * --SmartThemeBorderColor, etc.) — never hardcode colors.
+ */
+
+.roulette-extension {
+    /* Stub — populated as UI lands. */
+}

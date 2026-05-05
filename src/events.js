@@ -1,0 +1,2 @@
+/* SillyTavern-Roulette — AGPL-3.0
+ * Registers ST event listeners (MESSAGE_RECEIVED, GENERATION_STARTED, CHAT_CHANGED, CONNECTION_PROFILE_LOADED). */
