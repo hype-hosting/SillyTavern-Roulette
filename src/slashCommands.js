@@ -1,2 +1,110 @@
 /* SillyTavern-Roulette — AGPL-3.0
- * /roulette-start, /roulette-stop, /roulette-status, /roulette-skip command definitions. */
+ *
+ *   /roulette-start <queueName>   activate a queue on the current chat
+ *   /roulette-stop                deactivate rotation
+ *   /roulette-status              print current rotation state as a system msg
+ *   /roulette-skip                force-advance to the next slot
+ */
+
+import { SlashCommandParser } from '../../../../../scripts/slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../../../../scripts/slash-commands/SlashCommand.js';
+import {
+    SlashCommandArgument,
+    ARGUMENT_TYPE,
+} from '../../../../../scripts/slash-commands/SlashCommandArgument.js';
+import { getSettings, findQueue, getChatState } from './state.js';
+import { startRotation, stopRotation, skipCurrentSlot } from './events.js';
+
+function findQueueByName(name) {
+    if (!name) return null;
+    const queues = getSettings().queues;
+    return queues.find(q => q.name === name)
+        ?? queues.find(q => q.name.toLowerCase() === name.toLowerCase())
+        ?? null;
+}
+
+function queueNameProvider() {
+    return getSettings().queues.map(q => ({
+        value: q.name,
+        description: `${q.mode} · ${q.slots?.length ?? 0} slot(s)`,
+    }));
+}
+
+let registered = false;
+
+export function registerSlashCommands() {
+    if (registered) return;
+    registered = true;
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-start',
+        helpString: 'Start rotation on the current chat using the named queue.',
+        returns: 'name of the queue that was started, or empty on failure',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Queue name (as defined in Roulette settings)',
+                isRequired: true,
+                typeList: [ARGUMENT_TYPE.STRING],
+                enumProvider: queueNameProvider,
+            }),
+        ],
+        callback: async (_args, value) => {
+            const name = String(value ?? '').trim();
+            const queue = findQueueByName(name);
+            if (!queue) {
+                if (typeof toastr !== 'undefined') toastr.error(`Roulette: queue "${name}" not found.`);
+                return '';
+            }
+            const result = await startRotation(queue.id);
+            if (!result.ok) {
+                if (typeof toastr !== 'undefined') toastr.error(`Roulette: ${result.error}`);
+                return '';
+            }
+            return queue.name;
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-stop',
+        helpString: 'Stop Roulette rotation on the current chat.',
+        returns: 'empty string',
+        callback: async () => {
+            stopRotation();
+            return '';
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-status',
+        helpString: 'Print current Roulette rotation state.',
+        returns: 'human-readable status line',
+        callback: async () => {
+            const state = getChatState();
+            if (!state.activeQueueId) return 'Roulette: off';
+            const queue = findQueue(state.activeQueueId);
+            if (!queue) return 'Roulette: active queue missing';
+            const slot = queue.slots.find(s => s.id === state.currentSlotId);
+            const profile = slot?.profileName ?? '?';
+            const remaining = state.responsesRemaining;
+            const flag = state.manuallyOverridden ? ' (paused: manual override)' : '';
+            return `Roulette: ${queue.name} · ${profile} · ${remaining} left${flag}`;
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-skip',
+        helpString: 'Force-advance Roulette to the next slot immediately.',
+        returns: 'name of the new profile, or empty on failure',
+        callback: async () => {
+            const result = await skipCurrentSlot();
+            if (!result.ok) {
+                if (typeof toastr !== 'undefined') toastr.warning(`Roulette: ${result.error}`);
+                return '';
+            }
+            const state = getChatState();
+            const queue = findQueue(state.activeQueueId);
+            const slot = queue?.slots.find(s => s.id === state.currentSlotId);
+            return slot?.profileName ?? '';
+        },
+    }));
+}

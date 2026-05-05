@@ -13,46 +13,21 @@
  * for more details. <https://www.gnu.org/licenses/agpl-3.0.html>
  */
 
-import { eventSource, event_types } from '../../../../script.js';
+import { registerEventListeners } from './src/events.js';
+import { registerSlashCommands } from './src/slashCommands.js';
+import { mountSettingsPanel } from './src/ui/settingsPanel.js';
+import { mountStatusIndicator } from './src/ui/statusIndicator.js';
+import { getSettings } from './src/state.js';
 
 const EXT_NAME = 'Roulette';
 
-function onMessageReceived(messageId, type) {
-    console.debug(`[${EXT_NAME}] MESSAGE_RECEIVED id=${messageId} type=${type ?? 'normal'}`);
-}
-
-function onGenerationStarted(type, _options, dryRun) {
-    console.debug(`[${EXT_NAME}] GENERATION_STARTED type=${type ?? 'normal'} dryRun=${!!dryRun}`);
-}
-
-function onMessageSwiped(messageId) {
-    console.debug(`[${EXT_NAME}] MESSAGE_SWIPED id=${messageId}`);
-}
-
-function onChatChanged(chatId) {
-    console.debug(`[${EXT_NAME}] CHAT_CHANGED id=${chatId}`);
-}
-
-function onConnectionProfileLoaded(profileName) {
-    console.debug(`[${EXT_NAME}] CONNECTION_PROFILE_LOADED name=${profileName}`);
-}
-
-function registerEventListeners() {
-    eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
-    eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
-    eventSource.on(event_types.MESSAGE_SWIPED, onMessageSwiped);
-    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
-    eventSource.on(event_types.CONNECTION_PROFILE_LOADED, onConnectionProfileLoaded);
-}
-
-function registerSlashCommands() {
-    // TODO: register /roulette-start, /roulette-stop, /roulette-status, /roulette-skip
-    //       via SlashCommandParser.addCommandObject(SlashCommand.fromProps({...})).
-    console.debug(`[${EXT_NAME}] slash command registration stub`);
-}
-
 export async function init() {
-    console.log(`[${EXT_NAME}] init() called`);
+    console.log(`[${EXT_NAME}] init()`);
+    // Materialise settings block early so subsequent reads always see defaults.
+    getSettings();
+
     registerEventListeners();
     registerSlashCommands();
+    mountSettingsPanel();
+    mountStatusIndicator();
 }
