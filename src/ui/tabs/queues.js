@@ -1,22 +1,48 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
- * Queues tab — card grid + inline editor. Editor wiring lands in step 7;
- * this step ships the grid, mini-cylinder previews per card, and import
- * affordance. Cards are clickable to edit, with hover-revealed icons for
- * Start / Duplicate / Export / Delete. Active queue card is outlined in
- * brass and gets the breathing glow treatment.
+ * Queues tab. Two views inside this single tab pane:
+ *   'grid' — card grid + toolbar (default)
+ *   'edit' — embedded editor (renderEditorInto)
+ *
+ * Switching is in-pane; editing replaces the right pane content rather
+ * than stacking a popup over the modal. Save / Back returns to the grid.
  */
 
 import { getSettings, deleteQueue, getChatState, upsertQueue } from '../../state.js';
-import { startRotation, stopRotation, onRotationStateChanged } from '../../events.js';
+import { startRotation, stopRotation } from '../../events.js';
 import { renderCylinder } from '../cylinder.js';
 import { exportQueue, exportAllQueues, importQueueFile } from '../../exportImport.js';
-import { openQueueEditor } from '../queueEditor.js';
+import { renderEditorInto } from '../queueEditor.js';
 
 const tabState = new WeakMap();
 
 export function mountQueuesTab(container) {
     container.innerHTML = `
+        <div class="roulette-queues-pane" data-field="pane"></div>
+    `;
+    tabState.set(container, { view: 'grid', editingQueueId: null });
+    renderGridView(container);
+}
+
+export function refreshQueuesTab(container) {
+    if (!container) return;
+    const ts = tabState.get(container);
+    if (!ts) return;
+    if (ts.view === 'grid') renderGridView(container);
+    // edit view manages its own state — refresh would lose unsaved edits
+}
+
+function getPane(container) {
+    return container.querySelector('[data-field="pane"]');
+}
+
+function renderGridView(container) {
+    const ts = tabState.get(container);
+    ts.view = 'grid';
+    ts.editingQueueId = null;
+    const pane = getPane(container);
+
+    pane.innerHTML = `
         <div class="roulette-queues-layout">
             <div class="roulette-queues-toolbar">
                 <button type="button" class="roulette-action roulette-action-primary" data-act="new">
@@ -39,19 +65,18 @@ export function mountQueuesTab(container) {
         </div>
     `;
 
-    container.querySelector('[data-act="new"]').addEventListener('click', async () => {
-        const result = await openQueueEditor(null);
-        if (result.saved) refreshQueuesTab(container);
+    pane.querySelector('[data-act="new"]').addEventListener('click', () => {
+        renderEditView(container, null);
     });
-    container.querySelector('[data-act="export-all"]').addEventListener('click', () => {
+    pane.querySelector('[data-act="export-all"]').addEventListener('click', () => {
         if (getSettings().queues.length === 0) {
             if (typeof toastr !== 'undefined') toastr.info('No queues to export.');
             return;
         }
         exportAllQueues();
     });
-    const importInput = container.querySelector('[data-field="import-input"]');
-    container.querySelector('[data-act="import"]').addEventListener('click', () => importInput.click());
+    const importInput = pane.querySelector('[data-field="import-input"]');
+    pane.querySelector('[data-act="import"]').addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -63,7 +88,7 @@ export function mountQueuesTab(container) {
                     toastr.warning(`${result.rejected.length} queue(s) rejected: ${result.rejected.map(r => r.name).join(', ')}`);
                 }
             }
-            refreshQueuesTab(container);
+            renderGridView(container);
         } catch (err) {
             if (typeof toastr !== 'undefined') toastr.error(`Import failed: ${err.message}`);
             console.error('[Roulette] import failed:', err);
@@ -72,14 +97,13 @@ export function mountQueuesTab(container) {
         }
     });
 
-    tabState.set(container, { onModalClose: null });
-    refreshQueuesTab(container);
+    populateGrid(container);
 }
 
-export function refreshQueuesTab(container) {
-    if (!container) return;
-    const grid = container.querySelector('[data-field="grid"]');
-    const empty = container.querySelector('[data-field="empty-state"]');
+function populateGrid(container) {
+    const pane = getPane(container);
+    const grid = pane.querySelector('[data-field="grid"]');
+    const empty = pane.querySelector('[data-field="empty-state"]');
     if (!grid) return;
 
     const settings = getSettings();
@@ -92,10 +116,33 @@ export function refreshQueuesTab(container) {
         return;
     }
     empty.classList.add('hidden');
-
     for (const queue of settings.queues) {
         grid.appendChild(buildQueueCard(queue, activeQueueId === queue.id, container));
     }
+}
+
+function renderEditView(container, queue) {
+    const ts = tabState.get(container);
+    ts.view = 'edit';
+    ts.editingQueueId = queue?.id ?? null;
+    const pane = getPane(container);
+    pane.innerHTML = '';
+    pane.classList.add('roulette-queues-editing');
+
+    const editorHost = document.createElement('div');
+    editorHost.className = 'roulette-editor-host';
+    pane.appendChild(editorHost);
+
+    renderEditorInto(editorHost, queue, {
+        onSave: () => {
+            pane.classList.remove('roulette-queues-editing');
+            renderGridView(container);
+        },
+        onCancel: () => {
+            pane.classList.remove('roulette-queues-editing');
+            renderGridView(container);
+        },
+    });
 }
 
 function buildQueueCard(queue, isActive, tabContainer) {
@@ -148,11 +195,9 @@ function buildQueueCard(queue, isActive, tabContainer) {
     `;
     card.appendChild(actions);
 
-    // Card body click → edit (clicks on the action buttons stop propagation).
-    card.addEventListener('click', async (e) => {
+    card.addEventListener('click', (e) => {
         if (e.target.closest('.roulette-queue-card-actions')) return;
-        const result = await openQueueEditor(queue);
-        if (result.saved) refreshQueuesTab(tabContainer);
+        renderEditView(tabContainer, queue);
     });
     card.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -165,15 +210,14 @@ function buildQueueCard(queue, isActive, tabContainer) {
 
     actions.querySelector('[data-card-act="start"]')?.addEventListener('click', async () => {
         await startRotation(queue.id);
-        refreshQueuesTab(tabContainer);
+        populateGrid(tabContainer);
     });
     actions.querySelector('[data-card-act="stop"]')?.addEventListener('click', () => {
         stopRotation();
-        refreshQueuesTab(tabContainer);
+        populateGrid(tabContainer);
     });
-    actions.querySelector('[data-card-act="edit"]').addEventListener('click', async () => {
-        const result = await openQueueEditor(queue);
-        if (result.saved) refreshQueuesTab(tabContainer);
+    actions.querySelector('[data-card-act="edit"]').addEventListener('click', () => {
+        renderEditView(tabContainer, queue);
     });
     actions.querySelector('[data-card-act="duplicate"]').addEventListener('click', () => {
         const dup = structuredClone(queue);
@@ -183,7 +227,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
             dup.slots = dup.slots.map(s => ({ ...s, id: uuid() }));
         }
         upsertQueue(dup);
-        refreshQueuesTab(tabContainer);
+        populateGrid(tabContainer);
     });
     actions.querySelector('[data-card-act="export"]').addEventListener('click', () => {
         exportQueue(queue);
@@ -191,7 +235,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
     actions.querySelector('[data-card-act="delete"]').addEventListener('click', () => {
         if (!confirm(`Delete queue "${queue.name}"?`)) return;
         deleteQueue(queue.id);
-        refreshQueuesTab(tabContainer);
+        populateGrid(tabContainer);
     });
 
     return card;

@@ -1,11 +1,20 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
- * Queue editor modal. Uses ST's Popup class for theme-correct styling and
- * focus management. Supports both 'sequential' and 'weighted-random' modes.
+ * Queue editor. Shared form-building lives in buildEditorElement(); two
+ * presentation paths consume it:
  *
- * Slot reordering: HTML5 drag-and-drop. Grip handle on the left of each row.
- * Slot field changes are written through to the in-memory queue object on
- * every input event so re-renders (after drag, add, remove) don't lose edits.
+ *   - openQueueEditor(initialQueue) — ST Popup-class popup. Used by the
+ *     legacy drawer settings panel until step 10 trims it. Will also be
+ *     useful as a small confirm-style editor in future contexts.
+ *   - renderEditorInto(container, initialQueue, callbacks) — embeds the
+ *     form into a container. Used by the modal's Queues tab (step 7) so
+ *     editing replaces the right pane instead of stacking a popup.
+ *
+ * Shared:
+ *   - drag-and-drop slot reorder
+ *   - live-bound field changes write through to the queue object on input
+ *   - simulate-20-picks button (preview without saving)
+ *   - validateQueue + upsertQueue on Save
  */
 
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup.js';
@@ -42,12 +51,16 @@ function defaultQueue() {
 }
 
 /**
- * Open the editor for a new or existing queue.
+ * Build the editor form element and wire up all live-binding behaviour.
+ * Returns the element plus helpers; the CALLER decides how to present it
+ * (popup, embedded pane, etc.) and provides the Save action.
  *
- * @param {object|null} initialQueue null = new queue
- * @returns {Promise<{saved: boolean, queue: object|null}>}
+ * @param {object|null} initialQueue
+ * @returns {{element: HTMLElement, queue: object, finalize: () => string[]}}
+ *   `finalize` reads the name input + validates and returns errors (empty
+ *   if all good). It also normalises the queue.name in place.
  */
-export async function openQueueEditor(initialQueue = null) {
+export function buildEditorElement(initialQueue = null) {
     const queue = initialQueue
         ? structuredClone(initialQueue)
         : defaultQueue();
@@ -94,8 +107,6 @@ export async function openQueueEditor(initialQueue = null) {
         wrFixed.classList.toggle('hidden', isRange);
         wrMin.classList.toggle('hidden', !isRange);
         wrMax.classList.toggle('hidden', !isRange);
-        // The "–" separator span between min and max
-        wrMin.previousElementSibling?.classList?.toggle?.('hidden', !isRange); // no-op (previous is the input mode select)
     }
 
     function renderSlots() {
@@ -164,7 +175,24 @@ export async function openQueueEditor(initialQueue = null) {
 
     syncModeUI();
 
-    const popup = new Popup(root, POPUP_TYPE.CONFIRM, '', {
+    function finalize() {
+        queue.name = (nameInput.value || '').trim() || 'Queue';
+        return validateQueue(queue);
+    }
+
+    return { element: root, queue, finalize };
+}
+
+/**
+ * Open the editor as a popup (legacy path). Saves on AFFIRMATIVE result.
+ *
+ * @param {object|null} initialQueue
+ * @returns {Promise<{saved: boolean, queue: object|null}>}
+ */
+export async function openQueueEditor(initialQueue = null) {
+    const { element, queue, finalize } = buildEditorElement(initialQueue);
+
+    const popup = new Popup(element, POPUP_TYPE.CONFIRM, '', {
         okButton: 'Save',
         cancelButton: 'Cancel',
         wide: true,
@@ -177,9 +205,7 @@ export async function openQueueEditor(initialQueue = null) {
         return { saved: false, queue: null };
     }
 
-    queue.name = (nameInput.value || '').trim() || 'Queue';
-
-    const errors = validateQueue(queue);
+    const errors = finalize();
     if (errors.length) {
         if (typeof toastr !== 'undefined') {
             toastr.error('Cannot save queue:\n' + errors.join('\n'));
@@ -189,6 +215,64 @@ export async function openQueueEditor(initialQueue = null) {
 
     upsertQueue(queue);
     return { saved: true, queue };
+}
+
+/**
+ * Render the editor inline into a container, with explicit Save/Cancel
+ * buttons added above the form. onSave fires with the saved queue;
+ * onCancel fires with no args. Returns a dispose() callback that strips
+ * the editor.
+ *
+ * @param {HTMLElement} container
+ * @param {object|null} initialQueue
+ * @param {object} callbacks
+ * @param {(queue: object) => void} callbacks.onSave
+ * @param {() => void} callbacks.onCancel
+ * @returns {() => void} dispose
+ */
+export function renderEditorInto(container, initialQueue, { onSave, onCancel } = {}) {
+    const { element, queue, finalize } = buildEditorElement(initialQueue);
+    container.innerHTML = '';
+
+    // Header bar with Cancel/Save lives ABOVE the form so it's always
+    // visible without scrolling.
+    const header = document.createElement('div');
+    header.className = 'roulette-editor-header';
+    header.innerHTML = `
+        <button type="button" class="roulette-action" data-act="cancel">
+            <i class="fa-solid fa-arrow-left"></i><span>Back</span>
+        </button>
+        <div class="roulette-editor-title">${initialQueue ? 'Edit queue' : 'New queue'}</div>
+        <button type="button" class="roulette-action roulette-action-go" data-act="save">
+            <i class="fa-solid fa-check"></i><span>Save</span>
+        </button>
+    `;
+    container.appendChild(header);
+    container.appendChild(element);
+
+    const cancelBtn = header.querySelector('[data-act="cancel"]');
+    const saveBtn = header.querySelector('[data-act="save"]');
+
+    cancelBtn.addEventListener('click', () => {
+        onCancel?.();
+    });
+    saveBtn.addEventListener('click', () => {
+        const errors = finalize();
+        if (errors.length) {
+            if (typeof toastr !== 'undefined') {
+                toastr.error('Cannot save queue:\n' + errors.join('\n'));
+            }
+            return;
+        }
+        upsertQueue(queue);
+        onSave?.(queue);
+    });
+
+    return () => {
+        // No persistent listeners outside the element; container will be
+        // emptied by the caller, which removes the form. Provided for
+        // symmetry / future use.
+    };
 }
 
 function readWeightedRunCount(modeSel, fixed, min, max) {
@@ -203,10 +287,6 @@ function numOr(v, d) {
     return Number.isFinite(n) ? n : d;
 }
 
-/**
- * Render a single slot row. Field changes write through to `slot` so that
- * re-renders (after drag, add, remove) don't lose unsaved edits.
- */
 function slotRow(slot, index, mode, queue, rerender) {
     const row = document.createElement('div');
     row.className = 'roulette-slot-row';
@@ -238,7 +318,6 @@ function slotRow(slot, index, mode, queue, rerender) {
         </div>
     `;
 
-    // Form-control elements shouldn't initiate row drag.
     row.querySelectorAll('select, input').forEach(el => {
         el.addEventListener('mousedown', e => e.stopPropagation());
         el.draggable = false;
@@ -250,7 +329,6 @@ function slotRow(slot, index, mode, queue, rerender) {
         rerender();
     });
 
-    // Live-bind field changes to slot data.
     const profileSel = row.querySelector('[data-slot-field="profile"]');
     profileSel.addEventListener('change', () => { slot.profileName = profileSel.value.trim(); });
 
@@ -281,10 +359,6 @@ function slotRow(slot, index, mode, queue, rerender) {
     return row;
 }
 
-/**
- * Run 20 picks against the in-modal queue and render the resulting profile
- * sequence inline. Pure rotation — no persistence, no live ST involvement.
- */
 function renderSimulation(queue, outEl) {
     const errors = validateQueue(queue);
     if (errors.length) {
@@ -314,7 +388,6 @@ function renderSimulation(queue, outEl) {
             remaining = next.responses;
         }
     }
-    // Run-length encode for compact display.
     const runs = [];
     for (const name of seq) {
         const last = runs[runs.length - 1];
@@ -337,7 +410,6 @@ function escapeHtml(s) {
 
 function template() {
     return `
-        <h3 class="roulette-modal-title">Edit Queue</h3>
         <div class="roulette-form">
             <label class="roulette-field">
                 <span>Queue name</span>
