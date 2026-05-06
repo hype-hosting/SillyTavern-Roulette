@@ -419,8 +419,14 @@
     display: grid;
     grid-template-columns: 200px 1fr;
     flex: 1;
-    /* No fixed min-height — modal floor is set on the popup container
-     * itself so each tab can size to its own content. */
+    /* min-height: 0 + overflow: hidden is the classic "flex/grid child
+     * with overflow inside" fix: without it, flex: 1 happily grows past
+     * the shell's bounds when content is taller than the popup's
+     * max-height, and the inner tab-content's overflow-y: auto never
+     * triggers because nobody actually clips. With it, body honours the
+     * shell's bounded height and the tab content scrolls internally. */
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* Tab rail (left) */
@@ -481,6 +487,7 @@
     padding: 1.4rem 1.6rem;
     overflow-y: auto;
     background: var(--roulette-bg);
+    min-height: 0;
 }
 
 .roulette-tab-panel {
@@ -959,9 +966,16 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    padding-top: 0.4rem;
     padding-bottom: 0.6rem;
     border-bottom: 1px solid var(--roulette-border);
     margin-bottom: 0.4rem;
+    /* Stick to the top of the scrollable tab content so Back / Save
+     * stay reachable when editing a long queue. */
+    position: sticky;
+    top: -1.4rem;  /* offset cancels the tab-content's top padding */
+    background: var(--roulette-bg);
+    z-index: 2;
 }
 
 .roulette-editor-title {
