@@ -419,7 +419,8 @@
     display: grid;
     grid-template-columns: 200px 1fr;
     flex: 1;
-    min-height: 540px;
+    /* No fixed min-height — modal floor is set on the popup container
+     * itself so each tab can size to its own content. */
 }
 
 /* Tab rail (left) */
@@ -527,8 +528,11 @@
     box-shadow: 0 12px 48px -12px rgba(0, 0, 0, 0.65);
     width: min(1080px, 95vw);
     max-width: 95vw;
-    height: min(720px, 88vh);
-    max-height: 88vh;
+    /* Size to content. Floor keeps small tabs (sparse History, fresh
+     * Settings) from collapsing into something tiny; cap stops dense
+     * tabs (long History, many queues) from blowing past the viewport. */
+    min-height: 480px;
+    max-height: min(760px, 88vh);
     padding: 0;
 }
 
