@@ -352,8 +352,8 @@
     overflow: hidden;
     /* Soft inner vignette to add depth on the dark canvas. */
     box-shadow: inset 0 0 80px 0 rgba(0, 0, 0, 0.4);
-    min-width: min(900px, 95vw);
-    min-height: min(640px, 80vh);
+    width: 100%;
+    height: 100%;
 }
 
 @media (max-width: 720px) {
@@ -491,17 +491,47 @@
     color: var(--roulette-accent-soft);
 }
 
-/* Override ST's popup chrome inside our modal so the canvas reads as ours. */
+/* Override ST's popup chrome inside our modal so the canvas reads as ours.
+ *
+ * ST's `.large_dialogue_popup` and friends pin a fixed (and a bit small)
+ * width on the popup; we want the modal to scale up to a comfortable size
+ * on wide screens while still respecting the viewport on narrow ones.
+ * The :has() selector keeps these overrides scoped to OUR popup only. */
 
 .popup:has(.roulette-modal) .popup-content {
     padding: 0;
     background: transparent;
 }
 
-.popup:has(.roulette-modal) {
+.popup:has(.roulette-modal),
+.popup.large_dialogue_popup:has(.roulette-modal),
+.popup.wide_dialogue_popup:has(.roulette-modal) {
     background: var(--roulette-bg);
-    border-color: var(--roulette-border-strong);
     color: var(--roulette-text);
+    border: 1px solid var(--roulette-border-strong);
+    box-shadow: 0 12px 48px -12px rgba(0, 0, 0, 0.65);
+    width: min(1080px, 95vw);
+    max-width: 95vw;
+    height: min(720px, 88vh);
+    max-height: 88vh;
+    padding: 0;
+}
+
+/* ST applies a separate inner content wrapper that constrains height —
+ * make sure our chassis fills it fully. */
+.popup:has(.roulette-modal) .popup-content,
+.popup:has(.roulette-modal) > .popup-body {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border: none;
+}
+
+/* Hide ST's default popup OK/Cancel button row — we use our own header
+ * close button (the X provided by ST) and don't want the bottom row. */
+.popup:has(.roulette-modal) .popup-controls {
+    display: none;
 }
 
 /* ============================================================
@@ -640,6 +670,18 @@
 }
 
 .roulette-cylinder-pivot.roulette-cylinder-spinning-weighted {
+    transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+/* Counter-rotation groups — chamber decorations (gloss + label) and hub
+ * gloss. They animate via the SVG transform attribute (which CSS
+ * transitions support in modern browsers) in lock-step with the pivot,
+ * keeping labels and lighting world-upright while the cylinder spins. */
+.roulette-counter-rotate {
+    transition: transform calc(420ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
+}
+
+.roulette-cylinder-pivot.roulette-cylinder-spinning-weighted .roulette-counter-rotate {
     transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
