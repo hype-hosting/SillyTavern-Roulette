@@ -669,6 +669,198 @@
     100% { opacity: 0.75; filter: blur(10px); }
 }
 
+/* ============================================================
+ * Queues tab — toolbar + card grid
+ * ============================================================ */
+
+.roulette-queues-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.roulette-queues-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--roulette-border);
+}
+
+.roulette-queue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.8rem;
+}
+
+.roulette-queues-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 3rem 1rem;
+    color: var(--roulette-text-muted);
+    text-align: center;
+}
+
+.roulette-queues-empty i {
+    font-size: 2.5rem;
+    color: var(--roulette-accent-soft);
+    opacity: 0.5;
+}
+
+/* ---------- Queue card ---------- */
+
+.roulette-queue-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 0.8rem 0.8rem;
+    background: linear-gradient(180deg, var(--roulette-surface-2), var(--roulette-surface));
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 220ms ease;
+    overflow: hidden;
+}
+
+.roulette-queue-card:hover {
+    border-color: var(--roulette-accent-soft);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
+}
+
+.roulette-queue-card:focus-visible {
+    outline: 2px solid var(--roulette-accent);
+    outline-offset: 1px;
+}
+
+.roulette-queue-card-active {
+    border-color: var(--roulette-accent);
+    box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 22px -6px var(--roulette-glow);
+    animation: roulette-card-glow calc(2800ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
+}
+
+@keyframes roulette-card-glow {
+    from { box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 14px -8px var(--roulette-glow); }
+    to   { box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 28px -4px var(--roulette-glow-strong); }
+}
+
+.roulette-queue-card-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 90px;
+}
+
+.roulette-queue-card-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    width: 100%;
+    text-align: center;
+}
+
+.roulette-queue-card-name {
+    font-weight: 600;
+    color: var(--roulette-text);
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.roulette-queue-card-tags {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.roulette-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--roulette-bg);
+    color: var(--roulette-text-muted);
+    border: 1px solid var(--roulette-border);
+}
+
+.roulette-tag-mode {
+    color: var(--roulette-accent-soft);
+}
+
+.roulette-tag-active {
+    background: var(--roulette-accent);
+    color: var(--roulette-bg);
+    border-color: var(--roulette-accent);
+    font-weight: 600;
+}
+
+/* Action row revealed on hover. Slides up from the bottom edge. */
+
+.roulette-queue-card-actions {
+    display: flex;
+    gap: 0.3rem;
+    justify-content: center;
+    width: 100%;
+    margin-top: auto;
+    padding-top: 0.4rem;
+    opacity: 0.45;
+    transition: opacity 160ms ease;
+}
+
+.roulette-queue-card:hover .roulette-queue-card-actions,
+.roulette-queue-card:focus-within .roulette-queue-card-actions {
+    opacity: 1;
+}
+
+.roulette-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    color: var(--roulette-text-muted);
+    border: 1px solid var(--roulette-border);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    padding: 0;
+    font-size: 0.85rem;
+}
+
+.roulette-icon-btn:hover {
+    color: var(--roulette-text);
+    border-color: var(--roulette-accent-soft);
+    background: var(--roulette-surface-2);
+}
+
+.roulette-icon-btn-primary {
+    color: var(--roulette-accent);
+    border-color: var(--roulette-accent-soft);
+}
+
+.roulette-icon-btn-primary:hover {
+    border-color: var(--roulette-accent);
+    box-shadow: 0 0 12px -4px var(--roulette-glow);
+}
+
+.roulette-icon-btn-stop:hover {
+    color: var(--roulette-stop);
+    border-color: var(--roulette-stop);
+    box-shadow: 0 0 10px -4px rgba(217, 102, 102, 0.5);
+}
+
 /* Idle breathing on the active chamber halo. */
 .roulette-cylinder .roulette-chamber-halo {
     transform-origin: center;
