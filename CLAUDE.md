@@ -2,6 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
+**Version:** 1.0.0
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -14,6 +15,8 @@ A SillyTavern extension that rotates between connection profiles during roleplay
 Users select multiple SillyTavern connection profiles, drop them into a "queue," set a rotation policy (sequential with fixed or ranged response counts, or weighted-random), and the extension automatically switches the active connection profile as the chat proceeds. State is per-chat. A small status indicator surfaces the current profile and how many responses remain in the current slot.
 
 Because the unit of rotation is the **connection profile**, the extension does not need to know anything about individual providers, API endpoints, model names, or sampler parameters — all of that lives in the profile itself. The extension is a *scheduler* that calls the existing profile-switch slash command at the right moments.
+
+The v1.0 UI is centred on a **modal with a glassy revolver-cylinder visualisation**: the active queue's slots become chambers in a brass-collared cylinder, and rotation advances are shown as the cylinder spinning to bring the next chamber into firing position. The drawer block in SillyTavern's Extensions panel is a trimmed quick-access surface (status + start/stop + Open Roulette button).
 
 ---
 
@@ -203,38 +206,58 @@ Use ST's `SlashCommandParser.addCommandObject()` (verify exact import at scaffol
 
 ---
 
-## Out of scope for v1 (document for v2)
+## Shipped in v1.0 (originally out-of-scope or stretch)
 
-- **Per-slot parameter overrides** beyond what the connection profile carries. v1 leans entirely on profiles; if the user wants "DeepSeek cold" and "DeepSeek warm," they make two profiles.
+These were called out as v2 / stretch in the original spec but landed in v1.0:
+
+- **In-chat history visualisation** — `tabs/history.js` renders the trail strip + newest-first row list from `chat_metadata.roulette.history`.
+- **"Test rotation" simulate-20-picks button** — in the queue editor, runs `pickInitialSlot` + `advanceSlot` against the in-modal queue without saving, displays roll-by-roll output (each `advanceSlot` is its own run, so adjacent same-profile rolls don't visually merge).
+- **Queue export / import as JSON** — `src/exportImport.js`. Per-queue download icons + Export-all + Import. Envelope is `{ kind, schema, exportedAt, queue|queues }`; import accepts envelope, bare queue, or bare-array forms.
+- **Drag-to-reorder slots** — HTML5 drag-and-drop in the queue editor with grip handle, dashed-outline drop target, reduced-opacity source.
+- **Glassy revolver-cylinder UI + tabbed modal** — the v1.0 visual redesign. See `src/ui/modal.js`, `src/ui/cylinder.js`, and `src/ui/tabs/*` for structure.
+- **User UI prefs (animation speed, accent colour)** — persisted in `extension_settings.roulette.ui`; `applyUiSettings()` injects a `<style id="roulette-ui-overrides">` block to override `--roulette-*` tokens at runtime.
+- **Light + dark theme rendering** — modal owns its own dark canvas via `--roulette-*` tokens, independent of ST theme. Drawer + pill use ST CSS variables to blend with chat chrome.
+
+## Still out of scope (genuine v2)
+
+- **Per-slot parameter overrides** beyond what the connection profile carries. v1.0 leans entirely on profiles; for "DeepSeek cold" vs "DeepSeek warm", make two profiles.
 - **Blind mode** (hide which profile generated which message until reveal).
-- **Per-character default queues**.
-- **In-chat history visualization** beyond the metadata `history` array (which we record but don't render in v1).
-- **Cross-chat statistics** (how often each profile was used, etc).
-
-These are explicitly worth keeping in mind during architecture so v2 has a clean path. In particular: the `history` array should be populated from day one even though nothing renders it yet.
+- **Per-character default queues** (auto-activate a queue when a particular character is loaded).
+- **Cross-chat statistics** (how often each profile was used over all time, summary dashboards).
+- **Drag-load metaphor (variant L)** — the queue's chambers being directly loaded by dragging profile chips onto the cylinder, with the queue abstraction implicit. v1.0 ships variant P (read-only Chamber tab; editing in Queues tab).
 
 ---
 
-## Repository structure
+## Repository structure (v1.0)
 
 ```
 SillyTavern-Roulette/
 ├── manifest.json              # ST extension manifest
-├── index.js                   # entry point: registers settings UI, event listeners, slash commands
-├── style.css                  # scoped styles using ST CSS variables
-├── README.md                  # user-facing docs (install, usage, screenshots)
+├── index.js                   # entry point: init() wires every subsystem
+├── style.css                  # scoped styles + --roulette-* token set
+├── README.md                  # user-facing docs (value, install, recipes)
+├── TESTING.md                 # manual acceptance-criteria walkthrough
 ├── LICENSE                    # AGPL-3.0
 ├── src/
-│   ├── state.js               # extension_settings + chat_metadata helpers
-│   ├── rotation.js            # core rotation logic (pure functions, easily testable)
-│   ├── profileSwitcher.js     # slash-command wrapper + error handling
-│   ├── events.js              # event listener registration
+│   ├── state.js               # extension_settings + chat_metadata helpers; UI prefs
+│   ├── rotation.js            # PURE core rotation logic (no ST imports)
+│   ├── profileSwitcher.js     # /profile slash-command wrapper + isInternalSwitch flag
+│   ├── events.js              # ST event listeners + scheduler (start/stop/skip/spin)
 │   ├── slashCommands.js       # /roulette-* command definitions
+│   ├── exportImport.js        # queue JSON file download/upload helpers
 │   └── ui/
-│       ├── settingsPanel.js   # extensions drawer settings block
-│       ├── queueEditor.js     # the modal
-│       ├── statusIndicator.js # the chat-header indicator + popover
-│       └── templates.html     # any HTML fragments loaded via fetch
+│       ├── modal.js           # tabbed modal chassis (Chamber/Queues/History/Settings)
+│       ├── cylinder.js        # SVG glassy revolver-cylinder + spin animation
+│       ├── profileColors.js   # hash-based stable profile colour assignment
+│       ├── queueEditor.js     # form builder shared by popup + embedded paths
+│       ├── settingsPanel.js   # drawer block: status + quick actions + Open Roulette
+│       ├── statusIndicator.js # chat-input pill (icon by default, hover for details)
+│       ├── templates.html     # reserved for future fragments (currently empty)
+│       └── tabs/
+│           ├── chamber.js     # cylinder hero + status + Spin/Skip/Stop/Resume
+│           ├── queues.js      # card grid + inline editor (replaces right pane)
+│           ├── history.js     # trail strip + per-pick rows
+│           └── settings.js    # animation-speed slider + accent-colour picker
 └── .gitignore
 ```
 
@@ -249,8 +272,8 @@ SillyTavern-Roulette/
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "0.1.0",
-  "homePage": "https://github.com/<user>/SillyTavern-Roulette",
+  "version": "1.0.0",
+  "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
 }
@@ -309,7 +332,17 @@ Before firing `/profile <name>`, verify the profile still exists. If it doesn't,
 Persist `chat_metadata.roulette` after every state mutation (post-decrement, post-switch). Persist `extension_settings.roulette` on queue create/edit/delete. Use the debounced helpers; don't write synchronously on every message.
 
 ### Style scoping
-All CSS rules under a single root class (e.g. `.roulette-extension`) to avoid bleeding into ST's UI. Use CSS variables ST exposes for colors and borders so dark/light theme switches work without extra code.
+All CSS rules under a single root class (e.g. `.roulette-extension`) to avoid bleeding into ST's UI. The drawer + pill use ST CSS variables (`--SmartThemeBodyColor` etc.) so they blend with chat chrome. The modal owns its own `--roulette-*` token set scoped to `.roulette-extension`, so its identity is stable regardless of ST theme. The user can override `--roulette-accent`, `--roulette-glow`, and `--roulette-glow-strong` via the Settings tab; `applyUiSettings()` (in `state.js`) writes them into a single `<style id="roulette-ui-overrides">` block in `<head>`.
+
+### Modal architecture (v1.0)
+`src/ui/modal.js` owns the tabbed modal. Mounted via ST's `Popup` class with `POPUP_TYPE.DISPLAY`. Tab rail uses ARIA `tablist` semantics + arrow-key navigation. Tab modules under `src/ui/tabs/` each export `mount(container)` and `refresh(container)`. The modal subscribes to `onRotationStateChanged` from `events.js` and calls `refresh` on the active tab.
+
+The cylinder (`src/ui/cylinder.js`) is the centrepiece. Two key implementation notes:
+
+- **Pivot rotation** uses `transform-box: view-box` + `transform-origin: 50% 50%` so the rotation centre is the SVG viewBox centre, geometry-independent. Earlier iterations used `fill-box` and produced post-spin vertical drift because the active chamber's halo extended past the collar on whichever side the chamber currently sat — making the bbox asymmetric and the bbox-relative pivot drift by 1-2 pixels per spin.
+- **Counter-rotation groups** (`.roulette-counter-rotate`) wrap chamber labels and any "lighting" decoration that should stay world-upright as the cylinder rotates. `spinCylinderTo` updates the pivot's CSS transform AND every counter-rotate group's SVG transform attribute in lock-step; matching CSS transitions on both keep them synchronised through the spin.
+
+Sequential mode rotates by `360/N` per advance (snappy 420ms ease-out); weighted-random rotates by an integer number of full revolutions plus the target offset (1600ms long ease-out). The integer revolution count is critical — non-integer extras leave the cylinder offset from the target chamber by a fraction of a turn.
 
 ---
 
@@ -350,8 +383,15 @@ Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR
 
 ---
 
-## Stretch / nice-to-have for v1 if time permits
+## v1.0 milestone — done
 
-- A "test rotation" button in the queue editor that simulates 20 picks and shows the profile sequence so the user can sanity-check their config without committing.
-- Export/import queues as JSON (community sharing).
-- Keyboard shortcut to open the queue picker.
+The original v1 acceptance criteria all pass (see `TESTING.md` for the manual walkthrough). The modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, and user UI prefs all shipped on top.
+
+## Future work
+
+- **Per-character default queues** (auto-activate when a character is loaded).
+- **Blind mode** — hide which profile generated which message until the user reveals.
+- **Drag-load chamber metaphor** — drop profile chips directly onto chambers; the queue becomes implicit. Bigger UX change; wait until users ask for it.
+- **Cross-chat statistics** — total runs per profile, distribution dashboards.
+- **Keyboard shortcut to open the modal** (currently only the pill click + drawer button).
+- **Per-slot parameter overrides** — would mean reaching past the connection profile to override sampler settings. Architecturally clean to defer.
