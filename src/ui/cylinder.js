@@ -231,19 +231,12 @@ export function renderCylinder({
     });
 
     const defs = el('defs', {}, svg);
-    const glassId = nextId('glass');
     const glassActiveId = nextId('glass-active');
     const collarId = nextId('collar');
 
-    // Idle chamber glass (subtle gloss top-left, shadow bottom-right).
-    const grad = el('radialGradient', {
-        id: glassId, cx: '32%', cy: '28%', r: '78%',
-    }, defs);
-    el('stop', { offset: '0%',  'stop-color': 'rgba(255,250,240,0.22)' }, grad);
-    el('stop', { offset: '55%', 'stop-color': 'rgba(255,250,240,0.05)' }, grad);
-    el('stop', { offset: '100%', 'stop-color': 'rgba(0,0,0,0.30)' }, grad);
-
-    // Active chamber glass (warm brass-tinted core).
+    // Active chamber glass — centred brass-tinted glow. Chambers in the
+    // idle state use a flat translucent fill (no gradient), so they read
+    // as clean glassy disks rather than off-centre spheres.
     const gradA = el('radialGradient', {
         id: glassActiveId, cx: '50%', cy: '50%', r: '75%',
     }, defs);
@@ -305,8 +298,8 @@ export function renderCylinder({
         'stroke-width': mini ? 0.5 : 1,
     }, pivot);
 
-    // Hub. Body rotates with the cylinder; the gloss highlight lives in a
-    // counter-rotating group so light always falls from the same world angle.
+    // Hub — two concentric brass-bordered circles. No gloss highlight; the
+    // user wanted the centre kept clean.
     el('circle', {
         cx: center, cy: center, r: hubR,
         fill: 'var(--roulette-surface-2)',
@@ -320,15 +313,6 @@ export function renderCylinder({
         'stroke-width': mini ? 0.4 : 0.8,
         opacity: 0.6,
     }, pivot);
-    const hubCounter = el('g', {
-        class: 'roulette-counter-rotate',
-        transform: `rotate(${-startAngle} ${center} ${center})`,
-    }, pivot);
-    el('ellipse', {
-        cx: center - hubR * 0.25, cy: center - hubR * 0.4,
-        rx: hubR * 0.4, ry: hubR * 0.18,
-        fill: 'rgba(255,250,240,0.18)',
-    }, hubCounter);
 
     // Chambers
     if (N === 0) {
@@ -398,45 +382,25 @@ export function renderCylinder({
                 opacity: isActive ? 1 : (isEmpty ? 0.35 : 0.75),
             }, g);
 
-            // Glassy capsule fill.
+            // Chamber fill. Active chambers get the centred brass glow
+            // gradient; idle chambers get a flat translucent fill so they
+            // read as clean glassy disks (no off-centre sphere effect).
             el('circle', {
                 cx: 0, cy: 0, r,
-                fill: `url(#${isActive ? glassActiveId : glassId})`,
-                stroke: isActive ? 'var(--roulette-accent)' : 'rgba(0,0,0,0.5)',
+                fill: isActive ? `url(#${glassActiveId})` : 'rgba(255,250,240,0.04)',
+                stroke: isActive ? 'var(--roulette-accent)' : 'rgba(0,0,0,0.45)',
                 'stroke-width': mini ? 0.4 : 0.8,
                 opacity: isEmpty ? 0.55 : 1,
             }, g);
 
-            // Decorations (gloss arcs, label) live in a counter-rotating
-            // group so they stay world-upright while the chamber body
-            // travels with the cylinder. Counter-rotation matches the
-            // pivot's rotation in magnitude but opposite sign; both
-            // transitions share the same duration so they stay synced.
+            // Label lives in a counter-rotating group so it stays
+            // world-upright while the chamber body travels with the
+            // cylinder. Both transitions share the same duration so the
+            // counter-rotation tracks the pivot's spin.
             const content = el('g', {
                 class: 'roulette-counter-rotate',
                 transform: `rotate(${-startAngle})`,
             }, g);
-
-            // Top gloss crescent.
-            const arcR = r * 0.82;
-            el('path', {
-                d: `M ${-arcR * 0.85} ${-r * 0.18} A ${arcR} ${arcR} 0 0 1 ${arcR * 0.85} ${-r * 0.18}`,
-                fill: 'none',
-                stroke: 'rgba(255,250,240,0.5)',
-                'stroke-width': mini ? 0.7 : 1.3,
-                'stroke-linecap': 'round',
-                opacity: isEmpty ? 0.25 : (isActive ? 0.85 : 0.55),
-            }, content);
-
-            // Lower shadow crescent (for the glass volume effect).
-            el('path', {
-                d: `M ${-arcR * 0.7} ${r * 0.4} A ${arcR * 0.85} ${arcR * 0.85} 0 0 0 ${arcR * 0.7} ${r * 0.4}`,
-                fill: 'none',
-                stroke: 'rgba(0,0,0,0.35)',
-                'stroke-width': mini ? 0.5 : 1,
-                'stroke-linecap': 'round',
-                opacity: 0.7,
-            }, content);
 
             // Label — full-size only; mini variant uses the centred dot.
             if (!mini) {
