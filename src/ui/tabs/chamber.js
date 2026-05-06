@@ -1,13 +1,24 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
  * Chamber tab — cylinder visualization, status line, action buttons.
- * Subscribes to rotation state changes (via the modal's onRotationStateChanged
- * subscription) and re-renders on every refresh call.
+ *
+ * Cylinder lifecycle:
+ *  - Full re-render only when the queue changes or the cylinder is missing.
+ *  - When only the active slot changes, KEEP the existing SVG and animate
+ *    the pivot from its current angle to the new slot's firing-position
+ *    angle (via spinCylinderTo). Re-rendering on every tick would reset
+ *    the rotation and kill the animation.
+ *  - When responsesRemaining changes (no active-slot change), update the
+ *    pip ring in place. (Pip ring lands in step 5; for step 4 we still
+ *    re-render only the meta line.)
  */
 
 import { findQueue, getChatState, getSettings } from '../../state.js';
 import { startRotation, stopRotation, resumeRotation, skipCurrentSlot } from '../../events.js';
-import { renderCylinder } from '../cylinder.js';
+import { renderCylinder, spinCylinderTo, rotationForActiveIndex } from '../cylinder.js';
+
+// Per-mounted-tab state.
+const tabState = new WeakMap();
 
 export function mountChamberTab(container) {
     container.innerHTML = `
@@ -37,30 +48,30 @@ export function mountChamberTab(container) {
         </div>
     `;
 
+    tabState.set(container, {
+        lastQueueId: null,
+        lastActiveSlotId: null,
+        spinning: false,
+    });
+
     container.querySelector('[data-act="spin"]').addEventListener('click', async () => {
         const state = getChatState();
         if (state.activeQueueId) {
-            // Spin = force-advance the rotation
             await skipCurrentSlot();
         } else {
-            // Spin with no queue = start the first available queue
             const queues = getSettings().queues;
             if (queues.length === 0) return;
             await startRotation(queues[0].id);
         }
-        refreshChamberTab(container);
     });
     container.querySelector('[data-act="skip"]').addEventListener('click', async () => {
         await skipCurrentSlot();
-        refreshChamberTab(container);
     });
     container.querySelector('[data-act="stop"]').addEventListener('click', () => {
         stopRotation();
-        refreshChamberTab(container);
     });
     container.querySelector('[data-act="resume"]').addEventListener('click', () => {
         resumeRotation();
-        refreshChamberTab(container);
     });
 
     refreshChamberTab(container);
@@ -68,33 +79,61 @@ export function mountChamberTab(container) {
 
 export function refreshChamberTab(container) {
     if (!container) return;
+    const ts = tabState.get(container);
+    if (!ts) return;
+
     const host = container.querySelector('[data-field="cylinder-host"]');
-    const statusEl = container.querySelector('[data-field="status"]');
-    const queueInfoEl = container.querySelector('[data-field="queue-info"]');
-    const emptyHint = container.querySelector('[data-field="empty-hint"]');
-    const actionRow = container.querySelector('[data-field="actions"]');
-    const resumeBtn = container.querySelector('[data-act="resume"]');
-    const stopBtn = container.querySelector('[data-act="stop"]');
-    const skipBtn = container.querySelector('[data-act="skip"]');
-    const spinBtn = container.querySelector('[data-act="spin"]');
     if (!host) return;
 
     const state = getChatState();
     const queue = state.activeQueueId ? findQueue(state.activeQueueId) : null;
     const settings = getSettings();
-    // If no active rotation, fall back to previewing the first saved queue
-    // so the cylinder is never empty when queues exist.
+    // Preview the first saved queue when rotation is idle so the cylinder
+    // is never empty if the user has queues defined.
     const previewQueue = queue ?? settings.queues[0] ?? null;
+    const activeSlotId = queue ? state.currentSlotId : null;
 
-    host.innerHTML = '';
+    let svg = host.querySelector('.roulette-cylinder');
+    const queueChanged = previewQueue?.id !== ts.lastQueueId;
+    const needsFullRender = !svg || queueChanged;
+
     if (previewQueue) {
-        const svg = renderCylinder({
-            slots: previewQueue.slots ?? [],
-            activeSlotId: queue ? state.currentSlotId : null,
-            mode: previewQueue.mode,
-            mini: false,
-        });
-        host.appendChild(svg);
+        if (needsFullRender) {
+            host.innerHTML = '';
+            // When the queue switches with rotation already in flight,
+            // start with the new active slot already at firing position.
+            const startIndex = activeSlotId
+                ? previewQueue.slots.findIndex(s => s.id === activeSlotId)
+                : -1;
+            const initialAngle = rotationForActiveIndex(startIndex, previewQueue.slots.length);
+            svg = renderCylinder({
+                slots: previewQueue.slots ?? [],
+                activeSlotId,
+                mode: previewQueue.mode,
+                mini: false,
+                initialAngle,
+            });
+            host.appendChild(svg);
+            ts.lastQueueId = previewQueue.id;
+            ts.lastActiveSlotId = activeSlotId;
+        } else if (activeSlotId !== ts.lastActiveSlotId) {
+            // Active slot changed — animate the spin without losing the SVG.
+            const newIndex = previewQueue.slots.findIndex(s => s.id === activeSlotId);
+            // Update active visuals (halo, brass border) by re-rendering
+            // chambers in place. We animate FIRST then re-render so the
+            // spin lands on the visually-active chamber.
+            ts.spinning = true;
+            spinCylinderTo(svg, newIndex, previewQueue.slots.length, previewQueue.mode)
+                .then(() => {
+                    ts.spinning = false;
+                    // After spin settles, repaint to apply active-state
+                    // visuals to the new chamber.
+                    repaintCylinderChambers(svg, previewQueue, activeSlotId);
+                });
+            ts.lastActiveSlotId = activeSlotId;
+        }
+        // No active change but other state may have shifted (responsesRemaining,
+        // override flag) — meta refresh below handles it. Pip ring lands in step 5.
     } else {
         host.innerHTML = `
             <div class="roulette-stage-empty">
@@ -103,9 +142,57 @@ export function refreshChamberTab(container) {
                 <p class="roulette-text-muted">Build one in the <b>Queues</b> tab to load the chambers.</p>
             </div>
         `;
+        ts.lastQueueId = null;
+        ts.lastActiveSlotId = null;
     }
 
-    // Status line + meta.
+    refreshMeta(container, queue, previewQueue, state);
+}
+
+/**
+ * Repaint just the chamber active states (halo, brass border, fill) without
+ * reconstructing the SVG. Lets us preserve the cylinder rotation across
+ * active-slot changes.
+ */
+function repaintCylinderChambers(svg, queue, activeSlotId) {
+    const chambers = svg.querySelectorAll('.roulette-chamber');
+    chambers.forEach(g => {
+        const slotId = g.dataset.slotId;
+        const isActive = slotId === activeSlotId;
+        g.classList.toggle('roulette-chamber-active', isActive);
+        // Halo: ensure exactly one halo circle exists for active chamber
+        // and none for inactive ones. Halo circles are the first child
+        // when present (by convention from renderCylinder).
+        const existingHalo = g.querySelector('.roulette-chamber-halo');
+        if (isActive && !existingHalo) {
+            const SVG_NS = 'http://www.w3.org/2000/svg';
+            const fillCircle = g.querySelector('circle:not([stroke])') ?? g.querySelector('circle');
+            const r = Number(fillCircle?.getAttribute('r') ?? '0');
+            const halo = document.createElementNS(SVG_NS, 'circle');
+            halo.setAttribute('cx', '0');
+            halo.setAttribute('cy', '0');
+            halo.setAttribute('r', String(r + 12));
+            halo.setAttribute('fill', 'var(--roulette-glow)');
+            halo.setAttribute('opacity', '0.75');
+            halo.setAttribute('filter', 'blur(10px)');
+            halo.setAttribute('class', 'roulette-chamber-halo');
+            g.insertBefore(halo, g.firstChild);
+        } else if (!isActive && existingHalo) {
+            existingHalo.remove();
+        }
+    });
+}
+
+function refreshMeta(container, queue, previewQueue, state) {
+    const statusEl = container.querySelector('[data-field="status"]');
+    const queueInfoEl = container.querySelector('[data-field="queue-info"]');
+    const emptyHint = container.querySelector('[data-field="empty-hint"]');
+    const actionRow = container.querySelector('[data-field="actions"]');
+    const resumeBtn = container.querySelector('[data-act="resume"]');
+    const stopBtn = container.querySelector('[data-act="stop"]');
+    const skipBtn = container.querySelector('[data-act="skip"]');
+    const spinBtn = container.querySelector('[data-act="spin"]');
+
     if (queue) {
         const slot = queue.slots.find(s => s.id === state.currentSlotId);
         const profile = slot?.profileName ?? '?';
@@ -127,7 +214,6 @@ export function refreshChamberTab(container) {
         queueInfoEl.textContent = '';
     }
 
-    // Action visibility / labels.
     const hasRotation = !!queue;
     emptyHint.classList.toggle('hidden', !!previewQueue);
     actionRow.classList.toggle('roulette-action-row-disabled', !previewQueue);

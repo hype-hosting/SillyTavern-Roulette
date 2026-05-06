@@ -45,12 +45,98 @@ function truncate(s, max) {
 }
 
 /**
+ * Rotation angle (in degrees) that brings the slot at `activeIndex` to the
+ * firing position (top of the ring). Sequential mode uses this directly;
+ * weighted-random mode adds extra revolutions on top of it.
+ */
+export function rotationForActiveIndex(activeIndex, totalSlots) {
+    if (activeIndex < 0 || totalSlots <= 0) return 0;
+    return -(activeIndex * (360 / totalSlots));
+}
+
+/**
+ * Compute the next target angle given the cylinder's current angle, the
+ * slot index we want at the top, and the rotation mode. Always returns a
+ * value <= currentAngle so the cylinder spins clockwise visually.
+ *
+ * For 'weighted-random' the cylinder adds 3-5 extra revolutions so the spin
+ * has a wheel-of-fortune feel; for 'sequential' it just takes the short
+ * clockwise path.
+ */
+export function computeSpinTargetAngle(currentAngle, targetIndex, totalSlots, mode = 'sequential') {
+    const base = rotationForActiveIndex(targetIndex, totalSlots);
+    // Find an equivalent of `base` that's near `currentAngle` (within ±180°).
+    let near = base;
+    while (near - currentAngle > 180) near -= 360;
+    while (near - currentAngle < -180) near += 360;
+    if (mode === 'weighted-random') {
+        // 3-5 extra full revolutions, always clockwise (negative). Must be
+        // an integer number of revolutions so the cylinder lands EXACTLY
+        // on `near` and the active chamber settles at firing position.
+        const extraRevolutions = 3 + Math.floor(Math.random() * 3); // 3, 4, or 5
+        return near - 360 * extraRevolutions;
+    }
+    // Sequential — bias to clockwise, so equal-distance ties prefer the
+    // negative direction.
+    if (near > currentAngle) near -= 360;
+    return near;
+}
+
+/**
+ * Animate the cylinder's pivot from its current angle to the slot at
+ * `targetIndex`. Returns a Promise that resolves when the spin settles.
+ *
+ * The pivot group uses CSS transitions; this function flips the
+ * `roulette-cylinder-spinning-weighted` class to swap durations between
+ * the snappy (sequential) and long-ease-out (weighted) curves.
+ */
+export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential') {
+    if (!svg) return Promise.resolve();
+    const pivot = svg.querySelector('.roulette-cylinder-pivot');
+    if (!pivot) return Promise.resolve();
+    const currentAngle = Number(svg.dataset.cylinderAngle ?? '0');
+    const target = computeSpinTargetAngle(currentAngle, targetIndex, totalSlots, mode);
+    pivot.classList.toggle('roulette-cylinder-spinning-weighted', mode === 'weighted-random');
+    // Mark the active chamber as igniting (step 5 flash); the class is
+    // removed when the spin settles.
+    pivot.classList.add('roulette-cylinder-spinning');
+    svg.dataset.cylinderAngle = String(target);
+    pivot.style.transform = `rotate(${target}deg)`;
+    return new Promise(resolve => {
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            pivot.removeEventListener('transitionend', onEnd);
+            pivot.classList.remove('roulette-cylinder-spinning');
+            // Normalise stored angle to within (-360, 360] to keep numbers
+            // small over many spins.
+            const normalised = target - Math.trunc(target / 360) * 360;
+            svg.dataset.cylinderAngle = String(normalised);
+            pivot.style.transition = 'none';
+            pivot.style.transform = `rotate(${normalised}deg)`;
+            // Force reflow then restore transition for the next spin.
+            void pivot.offsetWidth;
+            pivot.style.transition = '';
+            resolve();
+        };
+        const onEnd = (e) => {
+            if (e.propertyName === 'transform') finish();
+        };
+        pivot.addEventListener('transitionend', onEnd);
+        // Safety timeout in case transitionend doesn't fire (tab-hidden,
+        // user-overridden CSS, etc.).
+        setTimeout(finish, mode === 'weighted-random' ? 1900 : 700);
+    });
+}
+
+/**
  * @param {object} options
  * @param {Array<{id, profileName?, weight?}>} options.slots
  * @param {string|null} options.activeSlotId
  * @param {'sequential'|'weighted-random'} options.mode
- * @param {boolean} options.mini      true = queue-card thumbnail variant
- * @param {number}  options.responsesRemaining  for the active chamber's pip ring (step 5)
+ * @param {boolean} options.mini       true = queue-card thumbnail variant
+ * @param {number|null} options.initialAngle  pre-set rotation (degrees)
  * @returns {SVGSVGElement}
  */
 export function renderCylinder({
@@ -58,7 +144,7 @@ export function renderCylinder({
     activeSlotId = null,
     mode = 'sequential',
     mini = false,
-    // responsesRemaining unused in step 2; landed in step 5
+    initialAngle = null,
 } = {}) {
     const N = slots.length;
     const viewBox = mini ? 100 : 400;
@@ -105,12 +191,28 @@ export function renderCylinder({
     el('stop', { offset: '50%', 'stop-color': '#7a623a' }, collarG);
     el('stop', { offset: '100%', 'stop-color': '#3a2f1c' }, collarG);
 
-    // Group everything inside a rotation pivot — step 4 will animate this.
+    // Group everything inside a rotation pivot. CSS transform on this group
+    // drives spin animations; SVG `transform` attribute is left blank
+    // because CSS transform takes precedence.
+    const activeIndex = activeSlotId
+        ? slots.findIndex(s => s.id === activeSlotId)
+        : -1;
+    const startAngle = initialAngle != null
+        ? Number(initialAngle)
+        : rotationForActiveIndex(activeIndex, N);
+    svg.dataset.cylinderAngle = String(startAngle);
     const pivot = el('g', {
         class: 'roulette-cylinder-pivot',
-        transform: `rotate(0 ${center} ${center})`,
         'data-pivot': 'true',
+        // No transition on initial render — applied via class so subsequent
+        // angle changes animate.
+        style: `transform: rotate(${startAngle}deg); transition: none;`,
     }, svg);
+    // Re-enable transitions on the next frame so subsequent spinCylinderTo
+    // calls animate.
+    requestAnimationFrame(() => {
+        pivot.style.transition = '';
+    });
 
     // Outer brass collar — two concentric circles for a beveled look.
     el('circle', {
