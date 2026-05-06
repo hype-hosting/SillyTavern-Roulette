@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "Hyperion Blackthorne",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
     "auto_update": true,
     "hooks": {

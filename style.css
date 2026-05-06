@@ -305,10 +305,25 @@
     opacity: 0.55;
 }
 
+/* Compact by default — text collapses to width 0 so the pill is just an
+ * icon. Hover or keyboard focus expands the label inline. Active rotation
+ * has gap > 0 even when collapsed so the icon doesn't sit flush against
+ * the (zero-width) text node. */
 .roulette-pill-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 0;
+    opacity: 0;
+    margin-left: -0.35rem;
+    transition: max-width 220ms ease, opacity 160ms ease, margin-left 220ms ease;
+}
+
+.roulette-pill:hover .roulette-pill-text,
+.roulette-pill:focus-visible .roulette-pill-text {
+    max-width: 18em;
+    opacity: 1;
+    margin-left: 0;
 }
 
 .roulette-popover {
