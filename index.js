@@ -18,7 +18,7 @@ import { registerSlashCommands } from './src/slashCommands.js';
 import { mountSettingsPanel } from './src/ui/settingsPanel.js';
 import { mountStatusIndicator } from './src/ui/statusIndicator.js';
 import { openRouletteModal } from './src/ui/modal.js';
-import { getSettings } from './src/state.js';
+import { getSettings, applyUiSettings } from './src/state.js';
 
 const EXT_NAME = 'Roulette';
 
@@ -35,6 +35,7 @@ export async function init() {
     console.log(`[${EXT_NAME}] init() called`);
     try {
         getSettings();
+        applyUiSettings();
         registerEventListeners();
         console.log(`[${EXT_NAME}] event listeners registered`);
         registerSlashCommands();
