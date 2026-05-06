@@ -23,7 +23,14 @@ const EXT_NAME = 'Roulette';
 
 console.log(`[${EXT_NAME}] module loaded`);
 
+let initialized = false;
+
 export async function init() {
+    if (initialized) {
+        console.log(`[${EXT_NAME}] init() called again — already initialized, skipping`);
+        return;
+    }
+    initialized = true;
     console.log(`[${EXT_NAME}] init() called`);
     try {
         getSettings();
@@ -37,6 +44,7 @@ export async function init() {
         console.log(`[${EXT_NAME}] status indicator mounted`);
         console.log(`[${EXT_NAME}] init() complete`);
     } catch (err) {
+        initialized = false; // allow retry
         console.error(`[${EXT_NAME}] init() failed:`, err);
         if (typeof toastr !== 'undefined') {
             toastr.error(`Roulette init failed: ${err?.message ?? err}`);
@@ -44,3 +52,11 @@ export async function init() {
         throw err;
     }
 }
+
+// Self-invoke as a fallback. ST's hooks.activate convention is supposed to
+// call init() for us, but in practice that path is silent-failing for some
+// installs. Top-level init is safe because every register/mount is guarded
+// by an idempotent flag.
+Promise.resolve().then(() => {
+    init().catch(err => console.error(`[${EXT_NAME}] self-init failed:`, err));
+});
