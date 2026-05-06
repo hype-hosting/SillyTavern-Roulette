@@ -81,16 +81,36 @@ export function closeRouletteModal() {
 
 function buildTabRail() {
     const rail = rootEl.querySelector('[data-field="tab-rail"]');
+    rail.setAttribute('role', 'tablist');
+    rail.setAttribute('aria-orientation', 'vertical');
     rail.innerHTML = '';
     for (const tab of TABS) {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'roulette-tab';
         item.dataset.tabId = tab.id;
+        item.setAttribute('role', 'tab');
+        item.setAttribute('aria-controls', `roulette-tab-panel-${tab.id}`);
+        item.id = `roulette-tab-${tab.id}`;
         item.innerHTML = `<i class="fa-solid ${tab.icon}"></i><span>${tab.label}</span>`;
         item.addEventListener('click', () => selectTab(tab.id));
+        item.addEventListener('keydown', (e) => onTabKeydown(e, tab.id));
         rail.appendChild(item);
     }
+}
+
+function onTabKeydown(e, currentTabId) {
+    const idx = TABS.findIndex(t => t.id === currentTabId);
+    if (idx < 0) return;
+    let nextIdx = -1;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nextIdx = (idx + 1) % TABS.length;
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') nextIdx = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') nextIdx = 0;
+    else if (e.key === 'End') nextIdx = TABS.length - 1;
+    if (nextIdx < 0) return;
+    e.preventDefault();
+    selectTab(TABS[nextIdx].id);
+    rootEl.querySelector(`[data-tab-id="${TABS[nextIdx].id}"]`)?.focus();
 }
 
 function buildTabPanels() {
@@ -100,6 +120,9 @@ function buildTabPanels() {
         const panel = document.createElement('div');
         panel.className = 'roulette-tab-panel hidden';
         panel.dataset.tabId = tab.id;
+        panel.id = `roulette-tab-panel-${tab.id}`;
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', `roulette-tab-${tab.id}`);
         host.appendChild(panel);
         tabPanels.set(tab.id, panel);
         try {
@@ -117,7 +140,10 @@ function selectTab(tabId) {
     activeTab = tabId;
 
     rootEl.querySelectorAll('.roulette-tab').forEach(el => {
-        el.classList.toggle('roulette-tab-active', el.dataset.tabId === tabId);
+        const isActive = el.dataset.tabId === tabId;
+        el.classList.toggle('roulette-tab-active', isActive);
+        el.setAttribute('aria-selected', String(isActive));
+        el.tabIndex = isActive ? 0 : -1;
     });
     rootEl.querySelectorAll('.roulette-tab-panel').forEach(el => {
         el.classList.toggle('hidden', el.dataset.tabId !== tabId);

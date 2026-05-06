@@ -352,8 +352,20 @@
     overflow: hidden;
     /* Soft inner vignette to add depth on the dark canvas. */
     box-shadow: inset 0 0 80px 0 rgba(0, 0, 0, 0.4);
-    min-width: min(900px, 90vw);
+    min-width: min(900px, 95vw);
     min-height: min(640px, 80vh);
+}
+
+@media (max-width: 720px) {
+    .roulette-modal-body {
+        grid-template-columns: 1fr !important;
+    }
+    .roulette-tab-rail {
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-right: none;
+        border-bottom: 1px solid var(--roulette-border);
+    }
 }
 
 .roulette-modal-shell {
@@ -1389,4 +1401,43 @@
 .roulette-action-go:hover {
     border-color: var(--roulette-go);
     box-shadow: 0 0 14px -4px rgba(111, 191, 115, 0.5);
+}
+
+/* ============================================================
+ * Accessibility — reduced motion
+ * ============================================================
+ * Honour the user's prefers-reduced-motion preference. Cylinder spins,
+ * pip flashes, ignition flares, breathing pulses — all become instant
+ * jumps so the rotation logic still works but no motion sickness vector.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+    .roulette-extension *,
+    .roulette-extension *::before,
+    .roulette-extension *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+    /* The pivot still needs to rotate — just instantaneously. */
+    .roulette-cylinder-pivot {
+        transition: transform 0.001ms !important;
+    }
+}
+
+/* Pill (in-chat input) — uses ST CSS variables to blend with the chat
+ * chrome. The button reset removes default <button> outlines. */
+
+.roulette-pill {
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.roulette-pill:focus {
+    outline: none;
+}
+
+.roulette-pill:focus-visible {
+    outline: 2px solid var(--roulette-accent, var(--SmartThemeBodyColor));
+    outline-offset: 2px;
 }
