@@ -1,14 +1,17 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
  * Queue editor modal. Uses ST's Popup class for theme-correct styling and
- * focus management. Supports both 'sequential' and 'weighted-random' modes;
- * slots reorder via Up/Down buttons (drag-to-reorder is v2).
+ * focus management. Supports both 'sequential' and 'weighted-random' modes.
+ *
+ * Slot reordering: HTML5 drag-and-drop. Grip handle on the left of each row.
+ * Slot field changes are written through to the in-memory queue object on
+ * every input event so re-renders (after drag, add, remove) don't lose edits.
  */
 
 import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup.js';
 import { listProfileNames } from '../profileSwitcher.js';
 import { upsertQueue } from '../state.js';
-import { validateQueue } from '../rotation.js';
+import { validateQueue, pickInitialSlot, advanceSlot } from '../rotation.js';
 
 function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -53,7 +56,6 @@ export async function openQueueEditor(initialQueue = null) {
     root.className = 'roulette-extension roulette-queue-editor';
     root.innerHTML = template();
 
-    // Initial population.
     const nameInput = root.querySelector('[data-field="name"]');
     const modeSelect = root.querySelector('[data-field="mode"]');
     const slotsContainer = root.querySelector('[data-field="slots"]');
@@ -64,6 +66,8 @@ export async function openQueueEditor(initialQueue = null) {
     const wrFixed = root.querySelector('[data-field="wr-fixed"]');
     const wrMin = root.querySelector('[data-field="wr-min"]');
     const wrMax = root.querySelector('[data-field="wr-max"]');
+    const simulateBtn = root.querySelector('[data-action="simulate"]');
+    const simulateOut = root.querySelector('[data-field="simulate-output"]');
 
     nameInput.value = queue.name ?? '';
     modeSelect.value = queue.mode ?? 'sequential';
@@ -73,27 +77,70 @@ export async function openQueueEditor(initialQueue = null) {
     wrFixed.value = wrc.fixed ?? 1;
     wrMin.value = wrc.min ?? 1;
     wrMax.value = wrc.max ?? 3;
+    syncWrCountModeUI();
+
+    nameInput.addEventListener('input', () => { queue.name = nameInput.value; });
+    noRepeatToggle.addEventListener('change', () => { queue.noRepeatInRow = noRepeatToggle.checked; });
+    wrCountModeSel.addEventListener('change', () => {
+        queue.weightedRunCount = readWeightedRunCount(wrCountModeSel, wrFixed, wrMin, wrMax);
+        syncWrCountModeUI();
+    });
+    [wrFixed, wrMin, wrMax].forEach(el => el.addEventListener('input', () => {
+        queue.weightedRunCount = readWeightedRunCount(wrCountModeSel, wrFixed, wrMin, wrMax);
+    }));
+
+    function syncWrCountModeUI() {
+        const isRange = wrCountModeSel.value === 'range';
+        wrFixed.classList.toggle('hidden', isRange);
+        wrMin.classList.toggle('hidden', !isRange);
+        wrMax.classList.toggle('hidden', !isRange);
+        // The "–" separator span between min and max
+        wrMin.previousElementSibling?.classList?.toggle?.('hidden', !isRange); // no-op (previous is the input mode select)
+    }
 
     function renderSlots() {
         slotsContainer.innerHTML = '';
         queue.slots.forEach((slot, i) => {
-            slotsContainer.appendChild(slotRow(slot, i, queue.mode, () => {
-                queue.slots.splice(i, 1);
-                if (queue.slots.length === 0) queue.slots.push(defaultSlot());
+            slotsContainer.appendChild(slotRow(slot, i, queue.mode, queue, renderSlots));
+        });
+        setupDragAndDrop();
+    }
+
+    function setupDragAndDrop() {
+        const rows = Array.from(slotsContainer.querySelectorAll('.roulette-slot-row'));
+        rows.forEach((row, i) => {
+            row.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(i));
+                row.classList.add('roulette-dragging');
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('roulette-dragging');
+                slotsContainer.querySelectorAll('.roulette-drag-over')
+                    .forEach(r => r.classList.remove('roulette-drag-over'));
+            });
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            row.addEventListener('dragenter', (e) => {
+                if (!row.classList.contains('roulette-dragging')) {
+                    row.classList.add('roulette-drag-over');
+                }
+                e.preventDefault();
+            });
+            row.addEventListener('dragleave', () => {
+                row.classList.remove('roulette-drag-over');
+            });
+            row.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const from = Number(e.dataTransfer.getData('text/plain'));
+                const to = i;
+                if (Number.isNaN(from) || from === to) return;
+                const [moved] = queue.slots.splice(from, 1);
+                queue.slots.splice(to, 0, moved);
                 renderSlots();
-            }, () => {
-                if (i <= 0) return;
-                const tmp = queue.slots[i - 1];
-                queue.slots[i - 1] = queue.slots[i];
-                queue.slots[i] = tmp;
-                renderSlots();
-            }, () => {
-                if (i >= queue.slots.length - 1) return;
-                const tmp = queue.slots[i + 1];
-                queue.slots[i + 1] = queue.slots[i];
-                queue.slots[i] = tmp;
-                renderSlots();
-            }));
+            });
         });
     }
 
@@ -111,6 +158,10 @@ export async function openQueueEditor(initialQueue = null) {
         syncModeUI();
     });
 
+    simulateBtn.addEventListener('click', () => {
+        renderSimulation(queue, simulateOut);
+    });
+
     syncModeUI();
 
     const popup = new Popup(root, POPUP_TYPE.CONFIRM, '', {
@@ -126,24 +177,7 @@ export async function openQueueEditor(initialQueue = null) {
         return { saved: false, queue: null };
     }
 
-    // Read back into the queue object.
-    queue.name = nameInput.value.trim() || 'Queue';
-    queue.mode = modeSelect.value;
-    queue.noRepeatInRow = noRepeatToggle.checked;
-    queue.weightedRunCount = readWeightedRunCount(wrCountModeSel, wrFixed, wrMin, wrMax);
-
-    // Read each slot row's current values (the row inputs mutate in place
-    // via change handlers, but read them once more here to be safe).
-    queue.slots.forEach((slot, i) => {
-        const row = slotsContainer.children[i];
-        if (!row) return;
-        slot.profileName = row.querySelector('[data-slot-field="profile"]').value.trim();
-        slot.countMode = row.querySelector('[data-slot-field="countMode"]')?.value ?? slot.countMode;
-        slot.fixedCount = numOr(row.querySelector('[data-slot-field="fixedCount"]')?.value, 1);
-        slot.minCount = numOr(row.querySelector('[data-slot-field="minCount"]')?.value, 1);
-        slot.maxCount = numOr(row.querySelector('[data-slot-field="maxCount"]')?.value, 3);
-        slot.weight = numOr(row.querySelector('[data-slot-field="weight"]')?.value, 1);
-    });
+    queue.name = (nameInput.value || '').trim() || 'Queue';
 
     const errors = validateQueue(queue);
     if (errors.length) {
@@ -169,15 +203,21 @@ function numOr(v, d) {
     return Number.isFinite(n) ? n : d;
 }
 
-function slotRow(slot, index, mode, onRemove, onUp, onDown) {
+/**
+ * Render a single slot row. Field changes write through to `slot` so that
+ * re-renders (after drag, add, remove) don't lose unsaved edits.
+ */
+function slotRow(slot, index, mode, queue, rerender) {
     const row = document.createElement('div');
     row.className = 'roulette-slot-row';
+    row.draggable = true;
     const profiles = listProfileNames();
     const profileOptions = ['<option value="">(select profile)</option>']
         .concat(profiles.map(p => `<option value="${escapeHtml(p)}"${p === slot.profileName ? ' selected' : ''}>${escapeHtml(p)}</option>`))
         .join('');
 
     row.innerHTML = `
+        <i class="fa-solid fa-grip-vertical roulette-slot-grip" title="Drag to reorder"></i>
         <div class="roulette-slot-num">${index + 1}.</div>
         <select class="text_pole roulette-slot-profile" data-slot-field="profile">${profileOptions}</select>
         ${mode === 'sequential'
@@ -194,27 +234,96 @@ function slotRow(slot, index, mode, onRemove, onUp, onDown) {
             : `<input type="number" class="text_pole roulette-slot-narrow" data-slot-field="weight" min="0" step="0.1" value="${slot.weight ?? 1}" title="Weight" />`
         }
         <div class="roulette-slot-actions">
-            <i class="menu_button fa-solid fa-arrow-up" data-action="up" title="Move up"></i>
-            <i class="menu_button fa-solid fa-arrow-down" data-action="down" title="Move down"></i>
             <i class="menu_button fa-solid fa-trash-can" data-action="remove" title="Remove slot"></i>
         </div>
     `;
-    row.querySelector('[data-action="remove"]').addEventListener('click', onRemove);
-    row.querySelector('[data-action="up"]').addEventListener('click', onUp);
-    row.querySelector('[data-action="down"]').addEventListener('click', onDown);
+
+    // Form-control elements shouldn't initiate row drag.
+    row.querySelectorAll('select, input').forEach(el => {
+        el.addEventListener('mousedown', e => e.stopPropagation());
+        el.draggable = false;
+    });
+
+    row.querySelector('[data-action="remove"]').addEventListener('click', () => {
+        queue.slots.splice(index, 1);
+        if (queue.slots.length === 0) queue.slots.push(defaultSlot());
+        rerender();
+    });
+
+    // Live-bind field changes to slot data.
+    const profileSel = row.querySelector('[data-slot-field="profile"]');
+    profileSel.addEventListener('change', () => { slot.profileName = profileSel.value.trim(); });
+
     if (mode === 'sequential') {
-        const countMode = row.querySelector('[data-slot-field="countMode"]');
+        const countModeSel = row.querySelector('[data-slot-field="countMode"]');
         const rangeWrap = row.querySelector('.roulette-range-fields');
         const fixedInput = row.querySelector('[data-slot-field="fixedCount"]');
+        const minInput = row.querySelector('[data-slot-field="minCount"]');
+        const maxInput = row.querySelector('[data-slot-field="maxCount"]');
         const sync = () => {
-            const isRange = countMode.value === 'range';
+            const isRange = countModeSel.value === 'range';
             rangeWrap.classList.toggle('hidden', !isRange);
             fixedInput.classList.toggle('hidden', isRange);
         };
-        countMode.addEventListener('change', () => { slot.countMode = countMode.value; sync(); });
+        countModeSel.addEventListener('change', () => {
+            slot.countMode = countModeSel.value;
+            sync();
+        });
+        fixedInput.addEventListener('input', () => { slot.fixedCount = numOr(fixedInput.value, 1); });
+        minInput.addEventListener('input', () => { slot.minCount = numOr(minInput.value, 1); });
+        maxInput.addEventListener('input', () => { slot.maxCount = numOr(maxInput.value, 3); });
         sync();
+    } else {
+        const weightInput = row.querySelector('[data-slot-field="weight"]');
+        weightInput.addEventListener('input', () => { slot.weight = numOr(weightInput.value, 1); });
     }
+
     return row;
+}
+
+/**
+ * Run 20 picks against the in-modal queue and render the resulting profile
+ * sequence inline. Pure rotation — no persistence, no live ST involvement.
+ */
+function renderSimulation(queue, outEl) {
+    const errors = validateQueue(queue);
+    if (errors.length) {
+        outEl.classList.remove('hidden');
+        outEl.innerHTML = `<div class="roulette-simulate-error">Cannot simulate — fix these first:<ul>${errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul></div>`;
+        return;
+    }
+    const PICKS = 20;
+    const seq = [];
+    let pick = pickInitialSlot(queue);
+    if (!pick) {
+        outEl.classList.remove('hidden');
+        outEl.textContent = 'Could not pick an initial slot.';
+        return;
+    }
+    let idx = pick.slotIndex;
+    let remaining = pick.responses;
+    let total = 0;
+    while (total < PICKS) {
+        seq.push(queue.slots[idx].profileName || '?');
+        remaining--;
+        total++;
+        if (remaining <= 0 && total < PICKS) {
+            const next = advanceSlot(queue, idx);
+            if (!next) break;
+            idx = next.slotIndex;
+            remaining = next.responses;
+        }
+    }
+    // Run-length encode for compact display.
+    const runs = [];
+    for (const name of seq) {
+        const last = runs[runs.length - 1];
+        if (last && last.name === name) last.count++;
+        else runs.push({ name, count: 1 });
+    }
+    const summary = runs.map(r => r.count > 1 ? `${escapeHtml(r.name)}×${r.count}` : escapeHtml(r.name)).join(', ');
+    outEl.classList.remove('hidden');
+    outEl.innerHTML = `<div class="roulette-simulate-result"><b>Sample of 20 picks:</b><br>${summary}</div>`;
 }
 
 function escapeHtml(s) {
@@ -247,7 +356,11 @@ function template() {
                 <button class="menu_button" data-action="add-slot" type="button">
                     <i class="fa-solid fa-plus"></i> Add slot
                 </button>
+                <button class="menu_button" data-action="simulate" type="button" title="Run 20 picks against this queue without saving">
+                    <i class="fa-solid fa-flask"></i> Simulate 20 picks
+                </button>
             </div>
+            <div data-field="simulate-output" class="roulette-simulate-output hidden"></div>
             <div data-field="weighted-footer" class="roulette-weighted-footer hidden">
                 <div class="roulette-section-title">Weighted-random options</div>
                 <label class="roulette-field-inline">

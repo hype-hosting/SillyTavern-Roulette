@@ -75,6 +75,55 @@
     font-style: italic;
 }
 
+.roulette-history-drawer {
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--SmartThemeBorderColor);
+    padding-top: 0.4rem;
+}
+
+.roulette-history-drawer > summary {
+    cursor: pointer;
+    list-style: revert;
+}
+
+.roulette-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.3rem;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.roulette-history-row {
+    display: grid;
+    grid-template-columns: 3.5em 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 3px;
+    background: var(--SmartThemeBlurTintColor);
+    font-size: 0.85em;
+}
+
+.roulette-history-id {
+    opacity: 0.7;
+    font-family: monospace;
+}
+
+.roulette-history-profile {
+    color: var(--SmartThemeBodyColor);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roulette-history-time {
+    opacity: 0.65;
+    font-size: 0.9em;
+}
+
 /* ---------- Queue editor modal ---------- */
 
 .roulette-queue-editor .roulette-modal-title {
@@ -124,6 +173,43 @@
     border-radius: 4px;
     background: var(--SmartThemeBlurTintColor);
     flex-wrap: wrap;
+    cursor: grab;
+}
+
+.roulette-slot-row.roulette-dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+}
+
+.roulette-slot-row.roulette-drag-over {
+    outline: 2px dashed var(--SmartThemeBodyColor);
+    outline-offset: -2px;
+}
+
+.roulette-slot-grip {
+    opacity: 0.55;
+    cursor: grab;
+    padding: 0 0.15rem;
+}
+
+.roulette-slot-grip:hover {
+    opacity: 0.9;
+}
+
+.roulette-simulate-output {
+    margin: 0.4rem 0;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 4px;
+    background: var(--SmartThemeBlurTintColor);
+    color: var(--SmartThemeBodyColor);
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.roulette-simulate-error ul {
+    margin: 0.3rem 0 0 1.2rem;
+    padding: 0;
 }
 
 .roulette-slot-num {

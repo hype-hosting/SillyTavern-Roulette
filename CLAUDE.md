@@ -258,6 +258,16 @@ SillyTavern-Roulette/
 
 `hooks.activate` names an exported function in `index.js` that ST calls on activation (every bundled extension uses `init`). With it, `index.js` should `export async function init() { ... }`. Without it, ST still imports the module and runs top-level code, but using the hook gives us a clean activation point that runs *after* core ST is ready.
 
+**Robustness pattern — self-invoke from top level.** In practice, `hooks.activate` has been observed to silently skip on some installs (likely a stale browser-cached `manifest.json` after re-install — `extensions.js:414` and `:418` both `return;` without logging if the fetched manifest lacks `hooks` or the named hook key). To survive that, `index.js` schedules `init()` from a top-level `Promise.resolve().then(init)` *in addition to* exporting it for the hook. Both call paths are made safe by per-subsystem idempotency guards:
+
+- `registerEventListeners` — `registered` flag in `src/events.js`
+- `registerSlashCommands` — `registered` flag in `src/slashCommands.js`
+- `mountSettingsPanel` — `mounted` flag in `src/ui/settingsPanel.js`
+- `mountStatusIndicator` — `pillEl` null-check in `src/ui/statusIndicator.js`
+- `init()` itself — `initialized` flag in `index.js`, reset to `false` on error to allow retry
+
+Net effect: the hook is the canonical path when it works; the self-invoke is a no-cost safety net when it doesn't.
+
 ---
 
 ## Implementation notes
