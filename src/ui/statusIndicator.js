@@ -1,14 +1,16 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
  * Persistent status pill mounted in the chat input area (#leftSendForm).
- * Click to open a small popover with stop/skip/resume actions.
+ * Clicking opens the full Roulette modal at the Chamber tab. The
+ * pill itself is a compact glance — queue name, current profile,
+ * responses-left, paused flag.
  */
 
 import { findQueue, getChatState } from '../state.js';
-import { onRotationStateChanged, stopRotation, skipCurrentSlot, resumeRotation } from '../events.js';
+import { onRotationStateChanged } from '../events.js';
+import { openRouletteModal } from './modal.js';
 
 let pillEl = null;
-let popoverEl = null;
 
 export function mountStatusIndicator() {
     if (pillEl) return;
@@ -17,75 +19,15 @@ export function mountStatusIndicator() {
         console.warn('[Roulette] no chat input mount point found; status indicator skipped');
         return;
     }
-    pillEl = document.createElement('div');
+    pillEl = document.createElement('button');
+    pillEl.type = 'button';
     pillEl.className = 'roulette-extension roulette-pill';
-    pillEl.tabIndex = 0;
-    pillEl.title = 'Roulette';
-    pillEl.addEventListener('click', togglePopover);
-    pillEl.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePopover(); }
-    });
+    pillEl.setAttribute('aria-label', 'Open Roulette');
+    pillEl.addEventListener('click', () => openRouletteModal('chamber'));
     target.appendChild(pillEl);
 
     onRotationStateChanged(render);
     render();
-}
-
-function togglePopover() {
-    if (popoverEl) { closePopover(); return; }
-    const state = getChatState();
-    if (!state.activeQueueId) return;
-    popoverEl = document.createElement('div');
-    popoverEl.className = 'roulette-extension roulette-popover';
-    renderPopover(state);
-    document.body.appendChild(popoverEl);
-    positionPopover();
-
-    setTimeout(() => {
-        document.addEventListener('mousedown', onDocClick, { once: true });
-    }, 0);
-}
-function onDocClick(e) {
-    if (popoverEl && !popoverEl.contains(e.target) && e.target !== pillEl) {
-        closePopover();
-    } else if (popoverEl) {
-        document.addEventListener('mousedown', onDocClick, { once: true });
-    }
-}
-function closePopover() {
-    if (popoverEl) {
-        popoverEl.remove();
-        popoverEl = null;
-    }
-}
-function positionPopover() {
-    if (!pillEl || !popoverEl) return;
-    const r = pillEl.getBoundingClientRect();
-    popoverEl.style.position = 'fixed';
-    popoverEl.style.bottom = `${Math.round(window.innerHeight - r.top + 4)}px`;
-    popoverEl.style.left = `${Math.round(r.left)}px`;
-    popoverEl.style.zIndex = '10000';
-}
-
-function renderPopover(state) {
-    const queue = findQueue(state.activeQueueId);
-    const slot = queue?.slots.find(s => s.id === state.currentSlotId);
-    popoverEl.innerHTML = `
-        <div class="roulette-popover-row">
-            <div><b>${escapeHtml(queue?.name ?? '?')}</b></div>
-            <div>Profile: ${escapeHtml(slot?.profileName ?? '?')}</div>
-            <div>${state.responsesRemaining} response(s) left in this slot</div>
-            ${state.manuallyOverridden ? '<div class="roulette-warn">Paused: manual override</div>' : ''}
-        </div>
-        <div class="roulette-popover-actions">
-            ${state.manuallyOverridden ? '<button class="menu_button" data-act="resume" type="button">Resume</button>' : ''}
-            <button class="menu_button" data-act="skip" type="button">Skip slot</button>
-            <button class="menu_button" data-act="stop" type="button">Stop rotation</button>
-        </div>
-    `;
-    popoverEl.querySelector('[data-act="stop"]')?.addEventListener('click', () => { stopRotation(); closePopover(); });
-    popoverEl.querySelector('[data-act="skip"]')?.addEventListener('click', async () => { await skipCurrentSlot(); closePopover(); });
-    popoverEl.querySelector('[data-act="resume"]')?.addEventListener('click', () => { resumeRotation(); closePopover(); });
 }
 
 function render() {
@@ -93,9 +35,8 @@ function render() {
     const state = getChatState();
     if (!state.activeQueueId) {
         pillEl.classList.add('roulette-pill-off');
-        pillEl.innerHTML = `<i class="fa-solid fa-dice"></i>`;
-        pillEl.title = 'Roulette: off';
-        if (popoverEl) closePopover();
+        pillEl.innerHTML = `<i class="fa-solid fa-circle-dot"></i>`;
+        pillEl.title = 'Roulette: off — click to open';
         return;
     }
     pillEl.classList.remove('roulette-pill-off');
@@ -105,16 +46,14 @@ function render() {
     const left = state.responsesRemaining;
     const paused = state.manuallyOverridden;
     pillEl.innerHTML = `
-        <i class="fa-solid fa-dice"></i>
+        <i class="fa-solid fa-circle-dot"></i>
         <span class="roulette-pill-text">
             ${escapeHtml(queue?.name ?? '?')} · ${escapeHtml(profile)} · ${left}${paused ? ' · paused' : ''}
         </span>
     `;
     pillEl.title = paused
-        ? 'Roulette paused (manual override) — click to resume/stop'
-        : `Roulette: ${queue?.name ?? '?'} (click for options)`;
-
-    if (popoverEl) renderPopover(state);
+        ? 'Roulette paused (manual override) — click to open'
+        : `Roulette: ${queue?.name ?? '?'} — click to open`;
 }
 
 function escapeHtml(s) {
