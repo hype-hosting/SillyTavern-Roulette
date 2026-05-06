@@ -660,10 +660,15 @@
 }
 
 /* Pivot rotation — sequential mode uses snappy ease-out, weighted-random
- * uses a longer roulette-wheel-style deceleration. transform-box+origin
- * keeps the rotation centered on the cylinder regardless of viewBox size. */
+ * uses a longer roulette-wheel-style deceleration. transform-box: view-box
+ * pins the rotation centre to the SVG viewBox centre (geometry-only); using
+ * fill-box would tie it to the rendered children's bbox, which shifts a
+ * couple pixels when the active chamber's halo extends past the collar
+ * on whichever side the chamber currently sits — that's what produced
+ * the post-spin vertical drift the user reported.
+ */
 .roulette-cylinder-pivot {
-    transform-box: fill-box;
+    transform-box: view-box;
     transform-origin: 50% 50%;
     transition: transform calc(420ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
     will-change: transform;
