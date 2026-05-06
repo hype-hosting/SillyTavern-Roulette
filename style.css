@@ -372,106 +372,12 @@
 }
 
 /* Tablet and below — collapse the side rail into a horizontal strip,
- * shrink padding, and let the cylinder size to its container. */
-@media (max-width: 720px) {
-    .roulette-modal-body {
-        grid-template-columns: 1fr !important;
-    }
-
-    .roulette-tab-rail {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding: 0.4rem 0.5rem;
-        gap: 0.3rem;
-        border-right: none;
-        border-bottom: 1px solid var(--roulette-border);
-    }
-
-    /* Horizontal-strip tabs: no left accent border, content-width only,
-     * no shrinking so the row scrolls when it overflows. */
-    .roulette-tab {
-        flex-shrink: 0;
-        margin-left: 0;
-        padding: 0.5rem 0.8rem;
-        border-left: none;
-        border-bottom: 3px solid transparent;
-    }
-
-    .roulette-tab.roulette-tab-active {
-        border-left: none;
-        border-bottom-color: var(--roulette-accent);
-    }
-
-    .roulette-tab-content {
-        padding: 1rem 0.9rem;
-    }
-
-    /* Cylinder shrinks to fit the stage (which is now full-width). The
-     * SVG is viewBox-based so it scales without distortion. */
-    .roulette-cylinder {
-        width: min(360px, 100%, 60vh);
-        height: min(360px, 100%, 60vh);
-    }
-
-    .roulette-chamber-stage {
-        min-height: 280px;
-    }
-
-    /* Sticky editor header offset must match the new tab-content top
-     * padding (1rem) so it docks to the visible top edge. */
-    .roulette-editor-header {
-        top: -1rem;
-    }
-}
-
-/* Phone-class widths — popup goes full-width, tab labels collapse to
- * icon-only (ARIA labels still announce the destination). */
-@media (max-width: 480px) {
-    .popup:has(.roulette-modal),
-    .popup.large_dialogue_popup:has(.roulette-modal),
-    .popup.wide_dialogue_popup:has(.roulette-modal) {
-        width: 100vw;
-        max-width: 100vw;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-    }
-
-    .roulette-modal {
-        border-radius: 0;
-    }
-
-    /* Icon-only tabs free up ~140px of horizontal space so all four fit
-     * without scrolling on most phones. The <span> labels are visually
-     * hidden but stay in the DOM for screen readers + the aria-label
-     * carries the same info. */
-    .roulette-tab span {
-        display: none;
-    }
-
-    .roulette-tab i {
-        font-size: 1.1rem;
-    }
-
-    .roulette-tab {
-        padding: 0.55rem 0.9rem;
-    }
-
-    /* Tighter modal header — close button stays the priority tap target. */
-    .roulette-modal-header {
-        padding: 0.6rem 0.8rem;
-    }
-
-    .roulette-modal-title {
-        font-size: 0.95rem;
-    }
-
-    .roulette-cylinder {
-        width: min(320px, 100%, 55vh);
-        height: min(320px, 100%, 55vh);
-    }
-}
+ * shrink padding, and let the cylinder size to its container.
+ *
+ * NOTE: these media queries live near the END of this file ON PURPOSE.
+ * CSS resolves equal-specificity rules by source order, so a media query
+ * earlier than the base rule it overrides will lose. Keep them last.
+ */
 
 .roulette-modal-shell {
     display: flex;
@@ -1600,6 +1506,117 @@
 .roulette-action-go:hover {
     border-color: var(--roulette-go);
     box-shadow: 0 0 14px -4px rgba(111, 191, 115, 0.5);
+}
+
+/* ============================================================
+ * Responsive — tablet and phone breakpoints
+ * ============================================================
+ * Located at the END of the file so equal-specificity rules below
+ * the base styles win in source order. Earlier iterations placed these
+ * near the top alongside the chassis CSS and the base rules silently
+ * undid them.
+ */
+
+/* Tablet and below — collapse the side rail into a horizontal strip,
+ * shrink padding, and let the cylinder size to its container. */
+@media (max-width: 720px) {
+    .roulette-modal-body {
+        grid-template-columns: 1fr !important;
+    }
+
+    .roulette-tab-rail {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 0.4rem 0.5rem;
+        gap: 0.3rem;
+        border-right: none;
+        border-bottom: 1px solid var(--roulette-border);
+    }
+
+    /* Horizontal-strip tabs: no left accent border, content-width only,
+     * no shrinking so the row scrolls when it overflows. */
+    .roulette-tab {
+        flex-shrink: 0;
+        margin-left: 0;
+        padding: 0.5rem 0.8rem;
+        border-left: none;
+        border-bottom: 3px solid transparent;
+    }
+
+    .roulette-tab.roulette-tab-active {
+        border-left: none;
+        border-bottom-color: var(--roulette-accent);
+    }
+
+    .roulette-tab-content {
+        padding: 1rem 0.9rem;
+    }
+
+    /* Cylinder shrinks to fit the stage (which is now full-width). The
+     * SVG is viewBox-based so it scales without distortion. */
+    .roulette-cylinder {
+        width: min(360px, 100%, 60vh);
+        height: min(360px, 100%, 60vh);
+    }
+
+    .roulette-chamber-stage {
+        min-height: 280px;
+    }
+
+    /* Sticky editor header offset must match the new tab-content top
+     * padding (1rem) so it docks to the visible top edge. */
+    .roulette-editor-header {
+        top: -1rem;
+    }
+}
+
+/* Phone-class widths — popup goes full-width, tab labels collapse to
+ * icon-only (ARIA labels still announce the destination). */
+@media (max-width: 480px) {
+    .popup:has(.roulette-modal),
+    .popup.large_dialogue_popup:has(.roulette-modal),
+    .popup.wide_dialogue_popup:has(.roulette-modal) {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+
+    .roulette-modal {
+        border-radius: 0;
+    }
+
+    /* Icon-only tabs free up ~140px of horizontal space so all four fit
+     * without scrolling on most phones. The <span> labels are visually
+     * hidden but stay in the DOM for screen readers + the aria-label
+     * carries the same info. */
+    .roulette-tab span {
+        display: none;
+    }
+
+    .roulette-tab i {
+        font-size: 1.1rem;
+    }
+
+    .roulette-tab {
+        padding: 0.55rem 0.9rem;
+    }
+
+    /* Tighter modal header — close button stays the priority tap target. */
+    .roulette-modal-header {
+        padding: 0.6rem 0.8rem;
+    }
+
+    .roulette-modal-title {
+        font-size: 0.95rem;
+    }
+
+    .roulette-cylinder {
+        width: min(320px, 100%, 55vh);
+        height: min(320px, 100%, 55vh);
+    }
 }
 
 /* ============================================================
