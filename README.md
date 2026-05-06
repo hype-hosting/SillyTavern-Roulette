@@ -1,19 +1,27 @@
+![Roulette Banner](assets/banner.png)
+
 # SillyTavern-Roulette
 
-A SillyTavern extension that rotates between connection profiles during a chat — sequentially or by weighted random — so you can mix models, parameters, and providers without manually switching. Built around a glassy revolver-cylinder visualisation of your active rotation.
+**A premium connection-profile rotation extension for SillyTavern by Hyperion.**
 
-**Version 1.0 · AGPL-3.0 · SillyTavern 1.12+**
+Roulette rotates between SillyTavern connection profiles during a chat — sequentially or by weighted random — so you can mix models, parameters, and providers without manually switching. Built around a glassy revolver-cylinder visualisation that turns the rotation into a moment, not a menu.
+
+[![Ko-fi](https://img.shields.io/badge/Support%20on-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/hype)
+[![Discord](https://img.shields.io/badge/Join%20the-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/therealhype)
+[![Substack](https://img.shields.io/badge/Read-The%20Hyperium-FF6719?logo=substack&logoColor=white)](https://hyperionblackthorne.substack.com)
 
 ---
 
-## Why use it
+## Why Roulette
 
-- **Beat prose fatigue.** Long chats with a single model develop visible patterns — the same sentence rhythms, the same body-language tics. Rotating in even one alternate model every few turns keeps the prose feeling fresh across thousands of messages.
-- **Pace your spend.** Mix a flagship model with a cheap one on a 1-in-5 schedule. You spend most turns on cheap inference and reserve the premium model for variety, without ever clicking a switch.
-- **Mitigate refusals.** Different models have different rails. When one balks at a scene, the next switch quietly hands the keyboard to a model with different boundaries. Less re-rolling, less interruption.
-- **Discover models without committing.** Drop a candidate into the rotation alongside your favourites. Get an honest, organic side-by-side over a real chat instead of a one-shot evaluation.
+The longer your chat runs, the more value Roulette adds. Four reasons most users install it:
 
-The more important your chat is to you, the more value Roulette adds.
+| Reason | What it solves | Best for |
+|---|---|---|
+| **Beat prose fatigue** | Long single-model chats develop visible patterns — same rhythms, same body-language tics. Even one alternate model in the rotation breaks the spell. | Long-running characters, multi-thousand-message arcs. |
+| **Pace your spend** | Schedule a flagship model 1-in-5 alongside a cheap workhorse. Most turns cost pennies; the premium model lands occasionally for variety. | Anyone juggling API budgets. |
+| **Mitigate refusals** | Different models have different rails. When one balks, the next switch hands the keyboard to a model with different boundaries. | Mature scenes, edge cases, anyone tired of re-rolling. |
+| **Discover models honestly** | Drop a candidate into the rotation and let it co-exist with your favourites for a few sessions. Real side-by-side, in your real chat. | Evaluating new providers without rebuilding your setup. |
 
 ---
 
@@ -27,13 +35,13 @@ Manual install: clone into `data/<user>/extensions/SillyTavern-Roulette/` (per-u
 
 ---
 
-## Quick start (3-model rotation)
+## Quick Start
 
-Assumes Roulette is already installed.
+A 3-model rotation in five steps. Assumes Roulette is installed.
 
 1. **Define three connection profiles** in SillyTavern's Connection Profiles UI. Pick three different models you want in the mix — e.g. `Sonnet 4.5`, `GLM-4.7`, `DeepSeek v3`. Give them clear names; you'll pick from these names in step 3.
 2. **Open the Roulette modal** — click the dice icon next to the chat input, or the **Open Roulette** button in the Extensions drawer.
-3. **Queues tab → New queue.** Name it something memorable (e.g. *Long-fiction blend*). Pick **Sequential** mode, drag in your three profiles, and set each slot's count (a good starting blend: `Sonnet=3`, `GLM=2`, `DeepSeek=4`).
+3. **Queues tab → New queue.** Name it (e.g. *Long-fiction blend*). Pick **Sequential** mode, drag in your three profiles, set each slot's count (try `Sonnet=3`, `GLM=2`, `DeepSeek=4`).
 4. **Save.** The queue appears as a card with a mini-cylinder preview. Click **Simulate 20 picks** in the editor first if you want to sanity-check the sequence.
 5. **Chamber tab → Spin** (or use the drawer's queue picker + Start). The cylinder loads, and from now on each AI response rotates through the chambers automatically.
 
@@ -43,7 +51,7 @@ The pill in the chat input shows the active queue and how many responses remain 
 
 ## Recipes
 
-Three queue configurations that map to common roleplayer goals.
+Four queue configurations that map to common roleplayer goals. Drop into the editor, save, run.
 
 ### Long-fiction blend (sequential)
 
@@ -55,7 +63,7 @@ Three frontier models in sequence, biased toward your favourite. Prevents prose 
 | 2 | Alternate voice (e.g. GLM or Gemini) | 2 |
 | 3 | Tertiary (e.g. DeepSeek) | 4 |
 
-Mode: **Sequential**. Total: ~9 turns per cycle.
+Mode: **Sequential** · ~9 turns per cycle.
 
 ### Budget classic (weighted-random)
 
@@ -63,25 +71,25 @@ Cheap model handles 80% of turns; flagship steps in occasionally for variety.
 
 | Slot | Profile | Weight |
 |---|---|---|
-| 1 | Cheap workhorse (open-router free tier, local Llama, etc.) | 4 |
+| 1 | Cheap workhorse (free-tier OpenRouter, local Llama, etc.) | 4 |
 | 2 | Flagship treat (Sonnet, Gemini Pro, GPT-5) | 1 |
 
-Mode: **Weighted-random**. Run length: range `1-3`. No-repeat: off.
+Mode: **Weighted-random** · run length range `1–3` · no-repeat off.
 
-### Personality split (sequential, no-repeat)
+### Personality split (alternating)
 
-A character with two distinct internal voices. Each turn alternates between the two — same character, two minds.
+A character with two distinct internal voices. Each turn alternates — same character, two minds.
 
 | Slot | Profile | Count |
 |---|---|---|
-| 1 | "Voice A" profile (warm, verbose) | 1 |
-| 2 | "Voice B" profile (cold, terse) | 1 |
+| 1 | "Voice A" (warm, verbose) | 1 |
+| 2 | "Voice B" (cold, terse) | 1 |
 
-Mode: **Sequential** with count 1 each (every turn switches). Or use **Weighted-random** with `no-repeat-in-row` enabled and equal weights for non-rigid alternation.
+Mode: **Sequential** with count `1` each. Or **Weighted-random** with `no-repeat-in-row` enabled and equal weights for non-rigid alternation.
 
-### TTRPG dice (weighted-random with wildcard)
+### TTRPG dice (weighted with wildcard)
 
-For users who like genuine narrative randomness — most turns are predictable, occasionally something unexpected happens.
+Most turns are predictable; occasionally something unexpected happens. Genuine narrative randomness.
 
 | Slot | Profile | Weight |
 |---|---|---|
@@ -89,44 +97,88 @@ For users who like genuine narrative randomness — most turns are predictable, 
 | 2 | Reliable narrator (alt) | 3 |
 | 3 | Wildcard (a model known to surprise you) | 1 |
 
-Mode: **Weighted-random**. Run length: range `1-2`.
+Mode: **Weighted-random** · run length range `1–2`.
 
 ---
 
-## Modes & options
+## Modes & Options
 
-**Sequential** — walks slots in order, looping back to the start. Each slot runs for either a *fixed* count or a *range* (rolled when that slot becomes active).
-
-**Weighted-random** — picks a slot by weighted random selection on each rotation boundary. Options:
-- *Run length* (fixed or range): how many responses each randomly-picked slot runs for.
-- *Don't repeat the same profile twice in a row*: forces variety.
+| Mode | Behaviour |
+|---|---|
+| **Sequential** | Walks slots in order, looping back to the start. Each slot runs for either a *fixed* count or a *range* (rolled when the slot becomes active). |
+| **Weighted-random** | Picks a slot by weighted random selection on each rotation boundary. Run length is fixed or rolled from a range. Optional *don't repeat the same profile twice in a row* toggle forces variety. |
 
 **Per-chat state** — every chat tracks its own rotation independently. Switch chats, and each one keeps its own active queue, slot, and counter.
 
 **Manual override** — if you switch profiles via SillyTavern's normal selector mid-rotation, Roulette pauses with a *Resume* affordance until you decide to continue.
 
-**Profile-deletion error path** — if a slot's profile is deleted, Roulette skips it and continues. Three consecutive failed slots halts the rotation with a toast.
+**Profile-deletion error path** — if a slot's profile is deleted, Roulette skips it. Three consecutive failed slots halts the rotation with a toast.
 
 ---
 
-## Slash commands
+## What's in the Modal
 
-- `/roulette-start <queueName>` — activate a queue on the current chat
-- `/roulette-stop` — deactivate
-- `/roulette-status` — print current state
-- `/roulette-skip` — force-advance to the next slot
+| Tab | What it is |
+|---|---|
+| **Chamber** | The live cylinder. Brass collar around glassy chambers; active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration. |
+| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). Import / export as JSON for sharing. |
+| **History** | Every AI response logged with its profile of origin. Trail strip shows the last twelve, full list newest-first. |
+| **Settings** | Animation speed slider (0.25× to 2×), accent-colour picker (six metal presets + custom), profile-palette display. |
 
 ---
 
-## What's in the modal
+## Slash Commands
 
-- **Chamber** — the live cylinder. Brass collar around glassy chambers, active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration.
-- **Queues** — card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). Import / export as JSON for sharing.
-- **History** — every AI response logged with its profile of origin. Trail strip shows the last twelve, full list newest-first.
-- **Settings** — animation speed slider (0.25× to 2×), accent-colour picker (six metal presets + custom), profile-palette display.
+| Command | Effect |
+|---|---|
+| `/roulette-start <queueName>` | Activate a queue on the current chat |
+| `/roulette-stop` | Deactivate rotation |
+| `/roulette-status` | Print current state |
+| `/roulette-skip` | Force-advance to the next slot |
+
+---
+
+## Versions
+
+| Version | Status | Notes |
+|---|---|---|
+| [v1.0](./CHANGELOG.md) | **Current** | Initial public release. Modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, animation/accent settings. |
+
+---
+
+## The Full Experience
+
+Roulette is one piece of a larger ecosystem. If you want to experience what these tools can really do when paired with handcrafted characters, deep worldbuilding, and a curated community, check out:
+
+**Timeless Tavern** — a SillyTavern instance hosted by me, Hyperion. Multi-user, multi-world, and running on a prompt architecture that goes well beyond what's published here. Access is through the [**Discord**](https://discord.gg/therealhype).
+
+**HYPERCODE** — my premium roleplay system prompt framework. Drop-in replacement for whatever you're running now; pairs naturally with Roulette. [GitHub →](https://github.com/hype-hosting/HYPERCODE)
+
+## Other Ways to Connect
+
+- **Discord** — [Hype Discord](https://discord.gg/therealhype) — Community, support, and access to Timeless Tavern.
+- **Ko-fi** — [ko-fi.com/hype](https://ko-fi.com/hype) — Support the work. Memberships and commissions available.
+- **The Hyperium** — [Substack](https://hyperionblackthorne.substack.com) — Writing, worldbuilding, and studio updates.
+- **Tumblr** — [@hyperionblackthorne](https://hyperionblackthorne.tumblr.com) — AI art and dark aesthetic.
 
 ---
 
 ## License
 
-[AGPL-3.0](./LICENSE) — matches SillyTavern's license.
+Roulette is released under [AGPL-3.0](./LICENSE) — the same license as SillyTavern. You're free to use, share, and adapt it; derivative works distributed publicly must remain open under the same terms. See the license file for full terms.
+
+## Contributing
+
+Found a bug? Have a recipe that should be in the README? Open an issue or submit a PR. Community contributions that improve the framework — especially additional recipes for common rotation patterns — are welcome.
+
+If you build something cool with Roulette, I'd love to hear about it. Drop into the [Discord](https://discord.gg/therealhype) and share.
+
+---
+
+<p align="center">
+  <a href="https://ko-fi.com/hype"><img src="https://img.shields.io/badge/Support%20on-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white&style=for-the-badge" alt="Support on Ko-fi"></a>
+  &nbsp;&nbsp;
+  <a href="https://discord.gg/therealhype"><img src="https://img.shields.io/badge/Join%20the-Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join the Discord"></a>
+</p>
+
+<p align="center"><em>Crafted by Hyperion</em></p>
