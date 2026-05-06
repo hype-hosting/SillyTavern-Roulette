@@ -44,6 +44,21 @@ function truncate(s, max) {
     return s.slice(0, Math.max(1, max - 1)) + '…';
 }
 
+function describeForScreenReader({ slots, activeSlotId, mode, mini, responsesRemaining, responsesAllotted }) {
+    if (mini) return `Queue preview, ${slots.length} chambers`;
+    const N = slots.length;
+    if (N === 0) return 'Roulette cylinder, no chambers loaded';
+    const active = slots.find(s => s.id === activeSlotId);
+    const head = `Roulette cylinder, ${mode}, ${N} chambers`;
+    if (active) {
+        const counter = responsesAllotted > 0
+            ? `, ${responsesRemaining} of ${responsesAllotted} responses left`
+            : '';
+        return `${head}. Active: ${active.profileName ?? 'unnamed'}${counter}`;
+    }
+    return `${head}. Idle`;
+}
+
 /**
  * Rotation angle (in degrees) that brings the slot at `activeIndex` to the
  * firing position (top of the ring). Sequential mode uses this directly;
@@ -158,12 +173,13 @@ export function renderCylinder({
     const hubR = mini ? 9 : 40;
     const ringR = mini ? 30 : 120;
 
+    const ariaLabel = describeForScreenReader({ slots, activeSlotId, mode, mini, responsesRemaining, responsesAllotted });
     const svg = el('svg', {
         viewBox: `0 0 ${viewBox} ${viewBox}`,
         class: mini ? 'roulette-cylinder roulette-cylinder-mini' : 'roulette-cylinder',
         xmlns: SVG_NS,
         role: 'img',
-        'aria-label': mini ? 'Queue preview' : 'Roulette cylinder',
+        'aria-label': ariaLabel,
     });
 
     const defs = el('defs', {}, svg);
