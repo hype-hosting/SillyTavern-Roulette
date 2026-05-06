@@ -17,6 +17,7 @@ import { registerEventListeners } from './src/events.js';
 import { registerSlashCommands } from './src/slashCommands.js';
 import { mountSettingsPanel } from './src/ui/settingsPanel.js';
 import { mountStatusIndicator } from './src/ui/statusIndicator.js';
+import { openRouletteModal } from './src/ui/modal.js';
 import { getSettings } from './src/state.js';
 
 const EXT_NAME = 'Roulette';
@@ -42,6 +43,10 @@ export async function init() {
         console.log(`[${EXT_NAME}] settings panel mounted`);
         mountStatusIndicator();
         console.log(`[${EXT_NAME}] status indicator mounted`);
+        // Debug helper: window.__roulette.openModal() pops the modal.
+        // Removed before v1.0 release; useful during the build-out of
+        // each tab.
+        globalThis.__roulette = { openModal: openRouletteModal };
         console.log(`[${EXT_NAME}] init() complete`);
     } catch (err) {
         initialized = false; // allow retry
