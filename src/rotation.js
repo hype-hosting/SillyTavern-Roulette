@@ -220,6 +220,7 @@ export function emptyState() {
         activeQueueId: null,
         currentSlotId: null,
         responsesRemaining: 0,
+        responsesAllotted: 0,
         lastSwitchMessageId: null,
         history: [],
         manuallyOverridden: false,

@@ -137,6 +137,8 @@ export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential'
  * @param {'sequential'|'weighted-random'} options.mode
  * @param {boolean} options.mini       true = queue-card thumbnail variant
  * @param {number|null} options.initialAngle  pre-set rotation (degrees)
+ * @param {number} options.responsesRemaining  responses left in active slot
+ * @param {number} options.responsesAllotted   total responses for this slot
  * @returns {SVGSVGElement}
  */
 export function renderCylinder({
@@ -145,6 +147,8 @@ export function renderCylinder({
     mode = 'sequential',
     mini = false,
     initialAngle = null,
+    responsesRemaining = 0,
+    responsesAllotted = 0,
 } = {}) {
     const N = slots.length;
     const viewBox = mini ? 100 : 400;
@@ -382,6 +386,26 @@ export function renderCylinder({
                     fill: colorForProfile(slot.profileName),
                     opacity: isActive ? 1 : 0.7,
                 }, g);
+            }
+
+            // Pip ring around the active chamber — one pip per response in
+            // the slot's allotment; dimmed pips have been consumed.
+            if (isActive && !mini && responsesAllotted > 0) {
+                const pipR = 3;
+                const pipDist = r + 9;
+                for (let p = 0; p < Math.min(responsesAllotted, 24); p++) {
+                    const pa = (p / responsesAllotted) * Math.PI * 2 - Math.PI / 2;
+                    const px = pipDist * Math.cos(pa);
+                    const py = pipDist * Math.sin(pa);
+                    const lit = p < responsesRemaining;
+                    el('circle', {
+                        cx: px, cy: py, r: pipR,
+                        fill: 'var(--roulette-accent)',
+                        opacity: lit ? 1 : 0.22,
+                        class: `roulette-pip ${lit ? '' : 'roulette-pip-dim'}`,
+                        'data-pip-index': p,
+                    }, g);
+                }
             }
         });
     }

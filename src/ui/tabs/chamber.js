@@ -112,28 +112,43 @@ export function refreshChamberTab(container) {
                 mode: previewQueue.mode,
                 mini: false,
                 initialAngle,
+                responsesRemaining: state.responsesRemaining,
+                responsesAllotted: state.responsesAllotted,
             });
             host.appendChild(svg);
             ts.lastQueueId = previewQueue.id;
             ts.lastActiveSlotId = activeSlotId;
+            ts.lastResponsesRemaining = state.responsesRemaining;
         } else if (activeSlotId !== ts.lastActiveSlotId) {
-            // Active slot changed — animate the spin without losing the SVG.
+            // Active slot changed — animate the spin, then re-render the
+            // cylinder at the new resting angle so the new active chamber
+            // gets its halo and pip ring.
             const newIndex = previewQueue.slots.findIndex(s => s.id === activeSlotId);
-            // Update active visuals (halo, brass border) by re-rendering
-            // chambers in place. We animate FIRST then re-render so the
-            // spin lands on the visually-active chamber.
             ts.spinning = true;
-            spinCylinderTo(svg, newIndex, previewQueue.slots.length, previewQueue.mode)
-                .then(() => {
-                    ts.spinning = false;
-                    // After spin settles, repaint to apply active-state
-                    // visuals to the new chamber.
-                    repaintCylinderChambers(svg, previewQueue, activeSlotId);
+            const N = previewQueue.slots.length;
+            spinCylinderTo(svg, newIndex, N, previewQueue.mode).then(() => {
+                ts.spinning = false;
+                const finalAngle = rotationForActiveIndex(newIndex, N);
+                host.innerHTML = '';
+                const newSvg = renderCylinder({
+                    slots: previewQueue.slots,
+                    activeSlotId,
+                    mode: previewQueue.mode,
+                    mini: false,
+                    initialAngle: finalAngle,
+                    responsesRemaining: state.responsesRemaining,
+                    responsesAllotted: state.responsesAllotted,
                 });
+                host.appendChild(newSvg);
+                triggerChamberIgnition(newSvg);
+                ts.lastResponsesRemaining = state.responsesRemaining;
+            });
             ts.lastActiveSlotId = activeSlotId;
+        } else if (state.responsesRemaining !== ts.lastResponsesRemaining) {
+            // Counter ticked — update pips in place, no re-render.
+            updatePipRing(svg, ts.lastResponsesRemaining ?? state.responsesRemaining, state.responsesRemaining);
+            ts.lastResponsesRemaining = state.responsesRemaining;
         }
-        // No active change but other state may have shifted (responsesRemaining,
-        // override flag) — meta refresh below handles it. Pip ring lands in step 5.
     } else {
         host.innerHTML = `
             <div class="roulette-stage-empty">
@@ -150,35 +165,42 @@ export function refreshChamberTab(container) {
 }
 
 /**
- * Repaint just the chamber active states (halo, brass border, fill) without
- * reconstructing the SVG. Lets us preserve the cylinder rotation across
- * active-slot changes.
+ * Trigger the post-spin ignition flash on the active chamber's halo.
+ * Adds a class that runs the keyframe animation, then removes it after
+ * the animation completes so subsequent spins can re-trigger it.
  */
-function repaintCylinderChambers(svg, queue, activeSlotId) {
-    const chambers = svg.querySelectorAll('.roulette-chamber');
-    chambers.forEach(g => {
-        const slotId = g.dataset.slotId;
-        const isActive = slotId === activeSlotId;
-        g.classList.toggle('roulette-chamber-active', isActive);
-        // Halo: ensure exactly one halo circle exists for active chamber
-        // and none for inactive ones. Halo circles are the first child
-        // when present (by convention from renderCylinder).
-        const existingHalo = g.querySelector('.roulette-chamber-halo');
-        if (isActive && !existingHalo) {
-            const SVG_NS = 'http://www.w3.org/2000/svg';
-            const fillCircle = g.querySelector('circle:not([stroke])') ?? g.querySelector('circle');
-            const r = Number(fillCircle?.getAttribute('r') ?? '0');
-            const halo = document.createElementNS(SVG_NS, 'circle');
-            halo.setAttribute('cx', '0');
-            halo.setAttribute('cy', '0');
-            halo.setAttribute('r', String(r + 12));
-            halo.setAttribute('fill', 'var(--roulette-glow)');
-            halo.setAttribute('opacity', '0.75');
-            halo.setAttribute('filter', 'blur(10px)');
-            halo.setAttribute('class', 'roulette-chamber-halo');
-            g.insertBefore(halo, g.firstChild);
-        } else if (!isActive && existingHalo) {
-            existingHalo.remove();
+function triggerChamberIgnition(svg) {
+    const active = svg.querySelector('.roulette-chamber-active');
+    if (!active) return;
+    active.classList.add('roulette-chamber-igniting');
+    const cleanup = () => active.classList.remove('roulette-chamber-igniting');
+    setTimeout(cleanup, 900);
+}
+
+/**
+ * In-place pip ring update: each pip whose index >= newRemaining gets a
+ * brief flash before settling into the dimmed state, so the user sees a
+ * concrete "tick" the moment a response is consumed.
+ */
+function updatePipRing(svg, prevRemaining, newRemaining) {
+    const active = svg.querySelector('.roulette-chamber-active');
+    if (!active) return;
+    const pips = active.querySelectorAll('.roulette-pip');
+    pips.forEach((pip) => {
+        const idx = Number(pip.dataset.pipIndex ?? '-1');
+        const wasLit = idx < prevRemaining;
+        const lit = idx < newRemaining;
+        if (wasLit && !lit) {
+            // Tick: flash, then dim.
+            pip.classList.add('roulette-pip-tick');
+            setTimeout(() => {
+                pip.classList.remove('roulette-pip-tick');
+                pip.classList.add('roulette-pip-dim');
+                pip.setAttribute('opacity', '0.22');
+            }, 280);
+        } else if (!wasLit && lit) {
+            pip.classList.remove('roulette-pip-dim');
+            pip.setAttribute('opacity', '1');
         }
     });
 }

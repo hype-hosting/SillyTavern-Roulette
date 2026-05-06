@@ -70,6 +70,7 @@ export async function startRotation(queueId) {
         state.activeQueueId = queue.id;
         state.currentSlotId = pick.slotId;
         state.responsesRemaining = pick.responses;
+        state.responsesAllotted = pick.responses;
         state.manuallyOverridden = false;
         state.lastSwitchMessageId = null;
     });
@@ -142,6 +143,7 @@ export async function skipCurrentSlot() {
     updateChatState(s => {
         s.currentSlotId = next.slotId;
         s.responsesRemaining = next.responses;
+        s.responsesAllotted = next.responses;
         s.manuallyOverridden = false;
     });
     const slot = queue.slots[next.slotIndex];
@@ -195,6 +197,7 @@ async function tryAdvanceFromFailure(queue, lastFailedIndex) {
     updateChatState(s => {
         s.currentSlotId = next.slotId;
         s.responsesRemaining = next.responses;
+        s.responsesAllotted = next.responses;
     });
     consecutiveFailures = 0;
     failedSlotIndices.clear();
@@ -271,6 +274,7 @@ async function onGenerationStarted(type, _options, dryRun) {
         updateChatState(s => {
             s.currentSlotId = next.slotId;
             s.responsesRemaining = next.responses;
+            s.responsesAllotted = next.responses;
             s.lastSwitchMessageId = state.history.at(-1)?.messageId ?? null;
         });
         const ok = await switchProfile(slot.profileName);
@@ -345,6 +349,9 @@ export function rerollCurrentSlotCounter() {
     const slot = queue.slots.find(s => s.id === state.currentSlotId);
     if (!slot) return;
     const responses = rollSlotResponses(slot, queue);
-    updateChatState(s => { s.responsesRemaining = responses; });
+    updateChatState(s => {
+        s.responsesRemaining = responses;
+        s.responsesAllotted = responses;
+    });
     notifyStateChanged();
 }

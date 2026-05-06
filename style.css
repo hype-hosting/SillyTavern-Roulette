@@ -637,6 +637,38 @@
     animation: none;
 }
 
+/* ============================================================
+ * Cylinder — pip ring + ignition flash
+ * ============================================================ */
+
+.roulette-pip {
+    transition: opacity 150ms ease;
+}
+
+.roulette-pip-tick {
+    animation: roulette-pip-tick calc(280ms / var(--roulette-anim-scale, 1)) ease-out;
+}
+
+@keyframes roulette-pip-tick {
+    0%   { opacity: 1;    fill: var(--roulette-accent); }
+    25%  { opacity: 1;    fill: rgba(255, 250, 240, 0.95); }
+    100% { opacity: 0.22; fill: var(--roulette-accent); }
+}
+
+/* Ignition flash on the active chamber's halo, fired once after a spin
+ * settles. The roulette-chamber-igniting class is added by chamber.js
+ * and removed when the animation completes. */
+.roulette-chamber-igniting .roulette-chamber-halo {
+    animation: roulette-ignite calc(900ms / var(--roulette-anim-scale, 1)) ease-out forwards;
+}
+
+@keyframes roulette-ignite {
+    0%   { opacity: 1.4; filter: blur(4px); }
+    20%  { opacity: 1.6; filter: blur(6px); }
+    60%  { opacity: 1;   filter: blur(8px); }
+    100% { opacity: 0.75; filter: blur(10px); }
+}
+
 /* Idle breathing on the active chamber halo. */
 .roulette-cylinder .roulette-chamber-halo {
     transform-origin: center;
