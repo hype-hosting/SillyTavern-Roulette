@@ -617,14 +617,24 @@
     overflow: visible;
 }
 
-/* Pivot — rotates during step-4 spin animations. */
+/* Pivot rotation — sequential mode uses snappy ease-out, weighted-random
+ * uses a longer roulette-wheel-style deceleration. transform-box+origin
+ * keeps the rotation centered on the cylinder regardless of viewBox size. */
 .roulette-cylinder-pivot {
-    transform-origin: center;
-    transition: transform calc(400ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    transition: transform calc(420ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
+    will-change: transform;
 }
 
 .roulette-cylinder-pivot.roulette-cylinder-spinning-weighted {
     transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+/* While spinning, suppress the active-chamber breathing so the spin reads
+ * cleanly without competing animations. */
+.roulette-cylinder-pivot.roulette-cylinder-spinning .roulette-chamber-halo {
+    animation: none;
 }
 
 /* Idle breathing on the active chamber halo. */
