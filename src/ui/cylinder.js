@@ -101,9 +101,9 @@ export function computeSpinTargetAngle(currentAngle, targetIndex, totalSlots, mo
  * Animate the cylinder's pivot from its current angle to the slot at
  * `targetIndex`. Returns a Promise that resolves when the spin settles.
  *
- * The pivot group uses CSS transitions; this function flips the
- * `roulette-cylinder-spinning-weighted` class to swap durations between
- * the snappy (sequential) and long-ease-out (weighted) curves.
+ * The pivot rotates with CSS transitions; counter-rotate groups (chamber
+ * decorations, hub gloss) animate in lock-step via SVG transform
+ * attribute transitions so labels stay world-upright.
  */
 export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential') {
     if (!svg) return Promise.resolve();
@@ -112,11 +112,10 @@ export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential'
     const currentAngle = Number(svg.dataset.cylinderAngle ?? '0');
     const target = computeSpinTargetAngle(currentAngle, targetIndex, totalSlots, mode);
     pivot.classList.toggle('roulette-cylinder-spinning-weighted', mode === 'weighted-random');
-    // Mark the active chamber as igniting (step 5 flash); the class is
-    // removed when the spin settles.
     pivot.classList.add('roulette-cylinder-spinning');
     svg.dataset.cylinderAngle = String(target);
     pivot.style.transform = `rotate(${target}deg)`;
+    applyCounterRotation(svg, target);
     return new Promise(resolve => {
         let done = false;
         const finish = () => {
@@ -130,7 +129,7 @@ export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential'
             svg.dataset.cylinderAngle = String(normalised);
             pivot.style.transition = 'none';
             pivot.style.transform = `rotate(${normalised}deg)`;
-            // Force reflow then restore transition for the next spin.
+            applyCounterRotation(svg, normalised, /*instant=*/true);
             void pivot.offsetWidth;
             pivot.style.transition = '';
             resolve();
@@ -139,10 +138,59 @@ export function spinCylinderTo(svg, targetIndex, totalSlots, mode = 'sequential'
             if (e.propertyName === 'transform') finish();
         };
         pivot.addEventListener('transitionend', onEnd);
-        // Safety timeout in case transitionend doesn't fire (tab-hidden,
-        // user-overridden CSS, etc.).
         setTimeout(finish, mode === 'weighted-random' ? 1900 : 700);
     });
+}
+
+/**
+ * Set the SVG `transform` attribute on every counter-rotation group to
+ * `rotate(-angle)` so decorations stay upright. With CSS transitions on
+ * those elements, this triggers a smooth animation in lock-step with the
+ * pivot. When `instant` is true, transitions are suspended for one frame
+ * so the post-spin angle normalisation doesn't visually re-spin labels.
+ */
+export function applyCounterRotation(svg, angle, instant = false) {
+    const counters = svg.querySelectorAll('.roulette-counter-rotate');
+    if (instant) {
+        counters.forEach(g => {
+            g.style.transition = 'none';
+            // Hub-counter uses absolute centre (translate around viewBox
+            // centre); chamber-counter uses local origin at the chamber
+            // centre. We can't tell from class alone, so read the previous
+            // attribute and rebuild.
+            const prev = g.getAttribute('transform') ?? '';
+            g.setAttribute('transform', rebuildCounterTransform(prev, angle));
+        });
+        // Restore transitions next frame.
+        requestAnimationFrame(() => {
+            counters.forEach(g => { g.style.transition = ''; });
+        });
+    } else {
+        counters.forEach(g => {
+            const prev = g.getAttribute('transform') ?? '';
+            g.setAttribute('transform', rebuildCounterTransform(prev, angle));
+        });
+    }
+}
+
+/**
+ * Replace the rotation portion of an existing transform attribute. Hub
+ * counter-rotates around the viewBox centre (matching the pivot's origin);
+ * chamber decorations counter-rotate around their local (0, 0) which is
+ * the chamber centre after the parent's translate. We distinguish by
+ * looking at the prior transform string for centre coordinates.
+ */
+function rebuildCounterTransform(prev, angle) {
+    const center = extractRotationCenter(prev);
+    return center
+        ? `rotate(${-angle} ${center.x} ${center.y})`
+        : `rotate(${-angle})`;
+}
+
+function extractRotationCenter(transform) {
+    const m = String(transform).match(/rotate\(\s*[-\d.]+\s+([-\d.]+)\s+([-\d.]+)\s*\)/);
+    if (!m) return null;
+    return { x: Number(m[1]), y: Number(m[2]) };
 }
 
 /**
@@ -257,7 +305,8 @@ export function renderCylinder({
         'stroke-width': mini ? 0.5 : 1,
     }, pivot);
 
-    // Hub.
+    // Hub. Body rotates with the cylinder; the gloss highlight lives in a
+    // counter-rotating group so light always falls from the same world angle.
     el('circle', {
         cx: center, cy: center, r: hubR,
         fill: 'var(--roulette-surface-2)',
@@ -271,12 +320,15 @@ export function renderCylinder({
         'stroke-width': mini ? 0.4 : 0.8,
         opacity: 0.6,
     }, pivot);
-    // Hub gloss
+    const hubCounter = el('g', {
+        class: 'roulette-counter-rotate',
+        transform: `rotate(${-startAngle} ${center} ${center})`,
+    }, pivot);
     el('ellipse', {
         cx: center - hubR * 0.25, cy: center - hubR * 0.4,
         rx: hubR * 0.4, ry: hubR * 0.18,
         fill: 'rgba(255,250,240,0.18)',
-    }, pivot);
+    }, hubCounter);
 
     // Chambers
     if (N === 0) {
@@ -355,6 +407,16 @@ export function renderCylinder({
                 opacity: isEmpty ? 0.55 : 1,
             }, g);
 
+            // Decorations (gloss arcs, label) live in a counter-rotating
+            // group so they stay world-upright while the chamber body
+            // travels with the cylinder. Counter-rotation matches the
+            // pivot's rotation in magnitude but opposite sign; both
+            // transitions share the same duration so they stay synced.
+            const content = el('g', {
+                class: 'roulette-counter-rotate',
+                transform: `rotate(${-startAngle})`,
+            }, g);
+
             // Top gloss crescent.
             const arcR = r * 0.82;
             el('path', {
@@ -364,7 +426,7 @@ export function renderCylinder({
                 'stroke-width': mini ? 0.7 : 1.3,
                 'stroke-linecap': 'round',
                 opacity: isEmpty ? 0.25 : (isActive ? 0.85 : 0.55),
-            }, g);
+            }, content);
 
             // Lower shadow crescent (for the glass volume effect).
             el('path', {
@@ -374,9 +436,9 @@ export function renderCylinder({
                 'stroke-width': mini ? 0.5 : 1,
                 'stroke-linecap': 'round',
                 opacity: 0.7,
-            }, g);
+            }, content);
 
-            // Label.
+            // Label — full-size only; mini variant uses the centred dot.
             if (!mini) {
                 const fontSize = Math.max(8, Math.min(13, r * 0.34));
                 const maxChars = Math.max(3, Math.floor(r / 4.5));
@@ -390,7 +452,7 @@ export function renderCylinder({
                         ? 'var(--roulette-text-dim)'
                         : (isActive ? 'var(--roulette-text)' : colorForProfile(slot.profileName)),
                     'pointer-events': 'none',
-                }, g);
+                }, content);
                 label.textContent = isEmpty ? '·' : truncate(slot.profileName, maxChars);
                 if (slot.profileName) {
                     const title = el('title', {}, g);
