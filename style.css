@@ -491,3 +491,269 @@
     border-color: var(--roulette-border-strong);
     color: var(--roulette-text);
 }
+
+/* ============================================================
+ * Chamber tab — layout
+ * ============================================================ */
+
+.roulette-chamber-layout {
+    display: grid;
+    grid-template-rows: 1fr auto auto auto;
+    gap: 1.4rem;
+    height: 100%;
+    align-items: center;
+}
+
+.roulette-chamber-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 360px;
+    /* radial vignette behind the cylinder so it floats off the canvas */
+    background:
+        radial-gradient(ellipse at center,
+            rgba(199, 164, 97, 0.06) 0%,
+            transparent 55%);
+}
+
+.roulette-stage-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--roulette-text-muted);
+    text-align: center;
+    padding: 2rem;
+}
+
+.roulette-stage-empty > i {
+    font-size: 3rem;
+    color: var(--roulette-accent-soft);
+    opacity: 0.65;
+}
+
+.roulette-stage-empty .roulette-text-muted {
+    color: var(--roulette-text-dim);
+    font-size: 0.9rem;
+}
+
+.roulette-chamber-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.roulette-chamber-status {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1.05rem;
+}
+
+.roulette-status-active-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--roulette-accent);
+    box-shadow: 0 0 8px var(--roulette-glow-strong);
+    animation: roulette-pulse calc(2500ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
+}
+
+.roulette-status-label {
+    color: var(--roulette-text);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.roulette-status-pill {
+    color: var(--roulette-text-muted);
+    font-size: 0.85rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 999px;
+    background: var(--roulette-surface-2);
+}
+
+.roulette-status-paused {
+    color: var(--roulette-stop);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.roulette-status-idle {
+    color: var(--roulette-text-dim);
+    font-style: italic;
+}
+
+.roulette-chamber-queue-info {
+    color: var(--roulette-text-muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+}
+
+.roulette-empty-hint {
+    text-align: center;
+    color: var(--roulette-text-muted);
+    font-size: 0.9rem;
+    margin: 0 auto;
+    max-width: 32rem;
+}
+
+/* ============================================================
+ * Cylinder — visual
+ * ============================================================ */
+
+.roulette-cylinder {
+    width: min(360px, 60vh);
+    height: min(360px, 60vh);
+    overflow: visible;
+    user-select: none;
+}
+
+.roulette-cylinder-mini {
+    width: 80px;
+    height: 80px;
+    overflow: visible;
+}
+
+/* Pivot — rotates during step-4 spin animations. */
+.roulette-cylinder-pivot {
+    transform-origin: center;
+    transition: transform calc(400ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
+}
+
+.roulette-cylinder-pivot.roulette-cylinder-spinning-weighted {
+    transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+/* Idle breathing on the active chamber halo. */
+.roulette-cylinder .roulette-chamber-halo {
+    transform-origin: center;
+    animation: roulette-breath calc(2500ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
+}
+
+@keyframes roulette-breath {
+    from { opacity: 0.45; }
+    to   { opacity: 0.9; }
+}
+
+@keyframes roulette-pulse {
+    from { opacity: 0.55; box-shadow: 0 0 4px var(--roulette-glow); }
+    to   { opacity: 1;    box-shadow: 0 0 12px var(--roulette-glow-strong); }
+}
+
+/* Inactive chamber hover — colour/stroke only; transform is owned by the
+ * SVG's positioning attribute and CSS transform here would teleport the
+ * chamber to the SVG origin. */
+.roulette-cylinder .roulette-chamber {
+    cursor: pointer;
+}
+
+.roulette-cylinder .roulette-chamber circle {
+    transition: stroke 160ms ease, opacity 160ms ease, fill 160ms ease;
+}
+
+.roulette-cylinder .roulette-chamber:hover:not(.roulette-chamber-active) circle[stroke] {
+    stroke: var(--roulette-accent);
+}
+
+.roulette-cylinder .roulette-chamber-empty:hover circle {
+    opacity: 0.85;
+}
+
+.roulette-firing-notch {
+    transform-origin: center bottom;
+    animation: roulette-notch-glow calc(3000ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
+    filter: drop-shadow(0 0 4px var(--roulette-glow));
+}
+
+@keyframes roulette-notch-glow {
+    from { filter: drop-shadow(0 0 2px var(--roulette-glow)); }
+    to   { filter: drop-shadow(0 0 8px var(--roulette-glow-strong)); }
+}
+
+/* ============================================================
+ * Action button row
+ * ============================================================ */
+
+.roulette-action-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.roulette-action-row-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.roulette-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    border-radius: 6px;
+    border: 1px solid var(--roulette-border-strong);
+    background: var(--roulette-surface);
+    color: var(--roulette-text);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 80ms ease;
+}
+
+.roulette-action i {
+    font-size: 0.9em;
+}
+
+.roulette-action:hover {
+    background: var(--roulette-surface-2);
+    border-color: var(--roulette-accent-soft);
+}
+
+.roulette-action:active {
+    transform: translateY(1px);
+}
+
+.roulette-action-primary {
+    border-color: var(--roulette-accent-soft);
+    color: var(--roulette-accent);
+    box-shadow: 0 0 0 0 var(--roulette-glow);
+}
+
+.roulette-action-primary:hover {
+    border-color: var(--roulette-accent);
+    background: linear-gradient(180deg, var(--roulette-surface-2), var(--roulette-surface));
+    box-shadow: 0 0 16px -4px var(--roulette-glow-strong);
+}
+
+.roulette-action-info {
+    color: var(--roulette-info);
+}
+
+.roulette-action-info:hover {
+    border-color: var(--roulette-info);
+    box-shadow: 0 0 14px -4px rgba(107, 168, 199, 0.5);
+}
+
+.roulette-action-stop {
+    color: var(--roulette-stop);
+}
+
+.roulette-action-stop:hover {
+    border-color: var(--roulette-stop);
+    box-shadow: 0 0 14px -4px rgba(217, 102, 102, 0.5);
+}
+
+.roulette-action-go {
+    color: var(--roulette-go);
+}
+
+.roulette-action-go:hover {
+    border-color: var(--roulette-go);
+    box-shadow: 0 0 14px -4px rgba(111, 191, 115, 0.5);
+}
