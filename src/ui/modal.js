@@ -48,6 +48,11 @@ export async function openRouletteModal(tabId = null) {
     if (tabId) activeTab = tabId;
     selectTab(activeTab);
 
+    // Our own close button — ST's popup chrome ✕ is unreliable on narrow
+    // viewports (positioned outside the popup bounds on iOS). Owning it
+    // here means the modal is always closeable.
+    rootEl.querySelector('[data-action="close"]').addEventListener('click', closeRouletteModal);
+
     popup = new Popup(rootEl, POPUP_TYPE.DISPLAY, '', {
         wide: true,
         large: true,
@@ -164,6 +169,9 @@ function template() {
                     <i class="fa-solid fa-circle-dot roulette-modal-glyph"></i>
                     <span>Roulette</span>
                 </div>
+                <button type="button" class="roulette-modal-close" data-action="close" aria-label="Close Roulette">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
             <div class="roulette-modal-body">
                 <nav class="roulette-tab-rail" data-field="tab-rail"></nav>
