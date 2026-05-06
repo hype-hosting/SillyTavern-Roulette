@@ -367,34 +367,42 @@ function renderSimulation(queue, outEl) {
         return;
     }
     const PICKS = 20;
-    const seq = [];
     let pick = pickInitialSlot(queue);
     if (!pick) {
         outEl.classList.remove('hidden');
         outEl.textContent = 'Could not pick an initial slot.';
         return;
     }
+
+    // Group output by roll boundary (each new advanceSlot is a new run),
+    // not by profile name. Otherwise weighted-random with no-repeat OFF
+    // can show "GLM-4.7×5" when in reality it was two independent rolls
+    // (e.g. 3 + 2) that happened to land on the same profile — making
+    // the range cap look like it was violated when it wasn't.
+    const runs = [];
     let idx = pick.slotIndex;
     let remaining = pick.responses;
     let total = 0;
+    let current = { name: queue.slots[idx].profileName || '?', count: 0 };
+    runs.push(current);
+
     while (total < PICKS) {
-        seq.push(queue.slots[idx].profileName || '?');
-        remaining--;
+        current.count++;
         total++;
+        remaining--;
         if (remaining <= 0 && total < PICKS) {
             const next = advanceSlot(queue, idx);
             if (!next) break;
             idx = next.slotIndex;
             remaining = next.responses;
+            current = { name: queue.slots[idx].profileName || '?', count: 0 };
+            runs.push(current);
         }
     }
-    const runs = [];
-    for (const name of seq) {
-        const last = runs[runs.length - 1];
-        if (last && last.name === name) last.count++;
-        else runs.push({ name, count: 1 });
-    }
-    const summary = runs.map(r => r.count > 1 ? `${escapeHtml(r.name)}×${r.count}` : escapeHtml(r.name)).join(', ');
+    const summary = runs
+        .filter(r => r.count > 0)
+        .map(r => r.count > 1 ? `${escapeHtml(r.name)}×${r.count}` : escapeHtml(r.name))
+        .join(', ');
     outEl.classList.remove('hidden');
     outEl.innerHTML = `<div class="roulette-simulate-result"><b>Sample of 20 picks:</b><br>${summary}</div>`;
 }
