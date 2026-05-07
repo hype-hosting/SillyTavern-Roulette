@@ -11,6 +11,7 @@
 
 import { getSettings, persistSettings, applyUiSettings } from '../../state.js';
 import { profileColorPalette } from '../profileColors.js';
+import { setWidgetEnabled, resetWidgetPosition } from '../widget.js';
 
 const DEFAULT_ACCENT = '#c7a461';
 const PRESETS = [
@@ -71,6 +72,23 @@ export function mountSettingsTab(container) {
                 <div class="roulette-palette-row" data-field="palette"></div>
             </div>
 
+            <div class="roulette-section">
+                <div class="roulette-section-title">Floating widget</div>
+                <p class="roulette-help">
+                    A draggable on-screen panel that mirrors the cylinder during chat. Click the
+                    cylinder area to open this modal at the Chamber tab; click the chevron to
+                    expand recent picks. Desktop only.
+                </p>
+                <div class="roulette-row-actions">
+                    <button type="button" class="roulette-action" data-act="toggle-widget">
+                        <i class="fa-solid fa-thumbtack"></i><span data-field="widget-toggle-label">Pin widget</span>
+                    </button>
+                    <button type="button" class="roulette-action" data-act="reset-widget-pos">
+                        <i class="fa-solid fa-arrows-to-dot"></i><span>Reset position</span>
+                    </button>
+                </div>
+            </div>
+
         </div>
     `;
 
@@ -105,6 +123,21 @@ export function mountSettingsTab(container) {
         persistSettings();
         applyUiSettings();
         renderPresets(ui, presetsRow, colorInput);
+    });
+
+    const widgetToggleBtn = container.querySelector('[data-act="toggle-widget"]');
+    const widgetToggleLabel = container.querySelector('[data-field="widget-toggle-label"]');
+    function syncWidgetLabel() {
+        widgetToggleLabel.textContent = ui.widget?.enabled ? 'Unpin widget' : 'Pin widget';
+        widgetToggleBtn.classList.toggle('roulette-action-go', !!ui.widget?.enabled);
+    }
+    syncWidgetLabel();
+    widgetToggleBtn.addEventListener('click', () => {
+        setWidgetEnabled(!ui.widget?.enabled);
+        syncWidgetLabel();
+    });
+    container.querySelector('[data-act="reset-widget-pos"]').addEventListener('click', () => {
+        resetWidgetPosition();
     });
 
     renderPresets(ui, presetsRow, colorInput);
