@@ -292,6 +292,28 @@ export function validateQueue(queue, availableProfileNames = null) {
                     errors.push(`Slot ${i + 1}: weight must be a non-negative number.`);
                 }
             }
+            // Optional tuning block (v1.2 inline sampler tuning). Structural
+            // validation only — the per-API param semantics live in
+            // src/sampling.js to keep this module ST-free.
+            if (slot.tuning != null) {
+                if (typeof slot.tuning !== 'object') {
+                    errors.push(`Slot ${i + 1}: tuning must be an object or absent.`);
+                } else {
+                    if (typeof slot.tuning.enabled !== 'boolean') {
+                        errors.push(`Slot ${i + 1}: tuning.enabled must be a boolean.`);
+                    }
+                    if (slot.tuning.params != null
+                        && typeof slot.tuning.params === 'object') {
+                        for (const [k, v] of Object.entries(slot.tuning.params)) {
+                            if (v != null && !Number.isFinite(v)) {
+                                errors.push(`Slot ${i + 1}: tuning.params.${k} must be a finite number.`);
+                            }
+                        }
+                    } else if (slot.tuning.params != null) {
+                        errors.push(`Slot ${i + 1}: tuning.params must be an object.`);
+                    }
+                }
+            }
         });
     }
     if (queue.mode === 'weighted-random' && queue.weightedRunCount) {

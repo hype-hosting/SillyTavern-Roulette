@@ -21,6 +21,15 @@ import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup
 import { listProfileNames } from '../profileSwitcher.js';
 import { upsertQueue } from '../state.js';
 import { validateQueue, pickInitialSlot, advanceSlot } from '../rotation.js';
+import {
+    resolveApiIdForProfile,
+    fieldsForApi,
+    apiSupportsParam,
+    TUNING_PARAM_IDS,
+    TUNING_PARAM_LABELS,
+    API_PARAM_MAP,
+    cleanupManagedPresetForSlot,
+} from '../sampling.js';
 
 function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -296,6 +305,9 @@ function slotRow(slot, index, mode, queue, rerender) {
         .concat(profiles.map(p => `<option value="${escapeHtml(p)}"${p === slot.profileName ? ' selected' : ''}>${escapeHtml(p)}</option>`))
         .join('');
 
+    const tuningEnabled = !!slot.tuning?.enabled;
+    const tuningOpenInitial = !!slot.tuning?.enabled || (slot.tuning && Object.keys(slot.tuning.params || {}).length > 0);
+
     row.innerHTML = `
         <i class="fa-solid fa-grip-vertical roulette-slot-grip" title="Drag to reorder"></i>
         <div class="roulette-slot-num">${index + 1}.</div>
@@ -314,8 +326,10 @@ function slotRow(slot, index, mode, queue, rerender) {
             : `<input type="number" class="text_pole roulette-slot-narrow" data-slot-field="weight" min="0" step="0.1" value="${slot.weight ?? 1}" title="Weight" />`
         }
         <div class="roulette-slot-actions">
+            <i class="menu_button fa-solid fa-sliders ${tuningEnabled ? 'roulette-slot-tune-active' : ''}" data-action="toggle-tuning" title="Tune sampler params for this slot"></i>
             <i class="menu_button fa-solid fa-trash-can" data-action="remove" title="Remove slot"></i>
         </div>
+        <div class="roulette-slot-tuning ${tuningOpenInitial ? '' : 'hidden'}" data-field="tuning"></div>
     `;
 
     row.querySelectorAll('select, input').forEach(el => {
@@ -323,14 +337,28 @@ function slotRow(slot, index, mode, queue, rerender) {
         el.draggable = false;
     });
 
-    row.querySelector('[data-action="remove"]').addEventListener('click', () => {
+    row.querySelector('[data-action="remove"]').addEventListener('click', async () => {
+        // Clean up the managed sampler preset before forgetting the slot.
+        await cleanupManagedPresetForSlot(slot);
         queue.slots.splice(index, 1);
         if (queue.slots.length === 0) queue.slots.push(defaultSlot());
         rerender();
     });
 
+    const tuningPanel = row.querySelector('[data-field="tuning"]');
+    const tuneBtn = row.querySelector('[data-action="toggle-tuning"]');
+    tuneBtn.addEventListener('click', () => {
+        tuningPanel.classList.toggle('hidden');
+    });
+    renderTuningPanel(tuningPanel, slot);
+
     const profileSel = row.querySelector('[data-slot-field="profile"]');
-    profileSel.addEventListener('change', () => { slot.profileName = profileSel.value.trim(); });
+    profileSel.addEventListener('change', () => {
+        slot.profileName = profileSel.value.trim();
+        // The new profile may use a different API; re-render the panel
+        // so the param subset matches.
+        renderTuningPanel(tuningPanel, slot);
+    });
 
     if (mode === 'sequential') {
         const countModeSel = row.querySelector('[data-slot-field="countMode"]');
@@ -357,6 +385,117 @@ function slotRow(slot, index, mode, queue, rerender) {
     }
 
     return row;
+}
+
+/**
+ * Build the inline sampler-tuning panel for a slot. Shows only params
+ * relevant to the slot's profile's API. Edits write through to
+ * slot.tuning.params; the enabled toggle gates whether the params are
+ * actually applied on rotation.
+ */
+function renderTuningPanel(panelEl, slot) {
+    if (!panelEl) return;
+    const apiId = resolveApiIdForProfile(slot.profileName);
+
+    if (!apiId) {
+        panelEl.innerHTML = `
+            <div class="roulette-tuning-empty">
+                Pick a profile first — sampler tuning is API-aware.
+            </div>
+        `;
+        return;
+    }
+
+    const map = API_PARAM_MAP[apiId];
+    const fields = fieldsForApi(apiId);
+    const supportedIds = TUNING_PARAM_IDS.filter(id => apiSupportsParam(apiId, id));
+
+    if (!slot.tuning) slot.tuning = { enabled: false, presetName: null, params: {} };
+    if (!slot.tuning.params) slot.tuning.params = {};
+
+    panelEl.innerHTML = `
+        <div class="roulette-tuning-header">
+            <span class="roulette-section-title">Sampler tuning</span>
+            <span class="roulette-tuning-api">API: <code>${escapeHtml(map.label || apiId)}</code></span>
+            <label class="roulette-tuning-toggle">
+                <input type="checkbox" data-tuning-field="enabled" ${slot.tuning.enabled ? 'checked' : ''} />
+                <span>Enable on rotation</span>
+            </label>
+        </div>
+        <div class="roulette-tuning-grid">
+            ${supportedIds.map(id => {
+                const spec = fields[id];
+                const current = slot.tuning.params[id];
+                const value = current != null ? current : (spec.min + spec.max) / 2;
+                return `
+                    <label class="roulette-tuning-param" data-tuning-field-row="${id}">
+                        <span class="roulette-tuning-param-label">${escapeHtml(TUNING_PARAM_LABELS[id])}</span>
+                        <input type="range"
+                               class="roulette-range roulette-tuning-slider"
+                               data-tuning-field="${id}"
+                               min="${spec.min}" max="${spec.max}" step="${spec.step}"
+                               value="${value}" />
+                        <input type="number"
+                               class="text_pole roulette-tuning-number"
+                               data-tuning-field-num="${id}"
+                               min="${spec.min}" max="${spec.max}" step="${spec.step}"
+                               value="${current != null ? current : ''}"
+                               placeholder="default" />
+                        <button type="button" class="roulette-tuning-clear" data-tuning-clear="${id}" title="Use profile default">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </label>
+                `;
+            }).join('')}
+        </div>
+    `;
+
+    const enabledInput = panelEl.querySelector('[data-tuning-field="enabled"]');
+    enabledInput.addEventListener('change', () => {
+        slot.tuning.enabled = enabledInput.checked;
+    });
+
+    // Wire each row: range and number stay in sync, clear button blanks
+    // the param so the profile's preset default is used at rotation time.
+    panelEl.querySelectorAll('.roulette-tuning-param').forEach(rowEl => {
+        const id = rowEl.dataset.tuningFieldRow;
+        const slider = rowEl.querySelector('[data-tuning-field]');
+        const number = rowEl.querySelector('[data-tuning-field-num]');
+        const clearBtn = rowEl.querySelector('[data-tuning-clear]');
+
+        const writeValue = (v) => {
+            if (v == null || v === '' || !Number.isFinite(Number(v))) {
+                delete slot.tuning.params[id];
+                number.value = '';
+            } else {
+                slot.tuning.params[id] = Number(v);
+                number.value = String(v);
+            }
+        };
+
+        slider.addEventListener('input', () => {
+            slider.parentElement.classList.add('roulette-tuning-touched');
+            writeValue(slider.value);
+        });
+        number.addEventListener('input', () => {
+            const v = number.value;
+            if (v === '') {
+                delete slot.tuning.params[id];
+            } else if (Number.isFinite(Number(v))) {
+                slot.tuning.params[id] = Number(v);
+                slider.value = v;
+            }
+        });
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            delete slot.tuning.params[id];
+            number.value = '';
+            // Snap slider to the midpoint as a visual reset; not committed
+            // because we deleted the param above.
+            const spec = fields[id];
+            slider.value = (spec.min + spec.max) / 2;
+        });
+    });
 }
 
 function renderSimulation(queue, outEl) {
