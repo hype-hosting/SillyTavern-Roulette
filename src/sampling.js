@@ -30,7 +30,7 @@ import { kai_settings } from '../../../../../scripts/kai-settings.js';
 import { nai_settings } from '../../../../../scripts/nai-settings.js';
 import { textgenerationwebui_settings } from '../../../../../scripts/textgen-settings.js';
 import { getPresetManager } from '../../../../../scripts/preset-manager.js';
-import { executeSlashCommandsWithOptions } from '../../../../../scripts/slash-commands.js';
+import { executeSlashCommandsWithOptions, CONNECT_API_MAP } from '../../../../../scripts/slash-commands.js';
 import { isInternalSwitch } from './profileSwitcher.js';
 
 /**
@@ -110,6 +110,13 @@ export const TUNING_PARAM_LABELS = {
  * Resolve the API id for a slot's profile. Returns null if the profile
  * isn't found or its API isn't one we have a map entry for.
  *
+ * NOTE: ConnectionProfile.api stores a USER-FACING API key from
+ * CONNECT_API_MAP (e.g., 'openrouter', 'claude', 'koboldcpp', 'google').
+ * Our API_PARAM_MAP is keyed on the MAIN-API id (e.g., 'openai',
+ * 'textgenerationwebui') because that's what the settings objects and
+ * preset manager use. We resolve through CONNECT_API_MAP[apiKey].selected
+ * to bridge the gap.
+ *
  * @param {string} profileName
  * @returns {string|null}
  */
@@ -118,9 +125,14 @@ export function resolveApiIdForProfile(profileName) {
     if (!Array.isArray(profiles)) return null;
     const profile = profiles.find(p => p.name === profileName);
     if (!profile) return null;
-    const apiId = profile.api;
-    if (!apiId) return null;
-    return API_PARAM_MAP[apiId] ? apiId : null;
+    const apiKey = profile.api;
+    if (!apiKey) return null;
+    // First try resolving via CONNECT_API_MAP (the typical case — apiKey
+    // is something like 'openrouter' that maps to main-API 'openai').
+    const mainApiId = CONNECT_API_MAP?.[apiKey]?.selected ?? apiKey;
+    // koboldhorde uses kobold's preset/settings
+    const normalised = mainApiId === 'koboldhorde' ? 'kobold' : mainApiId;
+    return API_PARAM_MAP[normalised] ? normalised : null;
 }
 
 /**
