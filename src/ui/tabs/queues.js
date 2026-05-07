@@ -13,6 +13,7 @@ import { startRotation, stopRotation } from '../../events.js';
 import { renderCylinder } from '../cylinder.js';
 import { exportQueue, exportAllQueues, importQueueFile } from '../../exportImport.js';
 import { renderEditorInto } from '../queueEditor.js';
+import { cleanupManagedPresetsForQueue } from '../../sampling.js';
 
 const tabState = new WeakMap();
 
@@ -164,11 +165,13 @@ function buildQueueCard(queue, isActive, tabContainer) {
 
     const meta = document.createElement('div');
     meta.className = 'roulette-queue-card-meta';
+    const hasTuning = (queue.slots ?? []).some(s => s.tuning?.enabled);
     meta.innerHTML = `
         <div class="roulette-queue-card-name" title="${escapeHtml(queue.name)}">${escapeHtml(queue.name)}</div>
         <div class="roulette-queue-card-tags">
             <span class="roulette-tag roulette-tag-mode">${queue.mode}</span>
             <span class="roulette-tag">${queue.slots?.length ?? 0} chambers</span>
+            ${hasTuning ? '<span class="roulette-tag roulette-tag-tuned" title="Has inline sampler tuning"><i class="fa-solid fa-sliders"></i> tuned</span>' : ''}
             ${isActive ? '<span class="roulette-tag roulette-tag-active">active</span>' : ''}
         </div>
     `;
@@ -232,8 +235,12 @@ function buildQueueCard(queue, isActive, tabContainer) {
     actions.querySelector('[data-card-act="export"]').addEventListener('click', () => {
         exportQueue(queue);
     });
-    actions.querySelector('[data-card-act="delete"]').addEventListener('click', () => {
+    actions.querySelector('[data-card-act="delete"]').addEventListener('click', async () => {
         if (!confirm(`Delete queue "${queue.name}"?`)) return;
+        // Clean up any sampler presets Roulette manages for this queue's
+        // slots before forgetting the queue. Best-effort — failures here
+        // log but don't block deletion.
+        try { await cleanupManagedPresetsForQueue(queue); } catch (_) { /* ignore */ }
         deleteQueue(queue.id);
         populateGrid(tabContainer);
     });

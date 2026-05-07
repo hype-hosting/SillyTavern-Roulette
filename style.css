@@ -292,6 +292,123 @@
     margin-left: auto;
 }
 
+.roulette-slot-tune-active {
+    color: var(--roulette-accent) !important;
+    text-shadow: 0 0 8px var(--roulette-glow);
+}
+
+/* Inline sampler-tuning panel — sits as a wrapped flex child below the
+ * slot row's primary controls. Width: 100% makes it take a full visual
+ * row inside the wrap. */
+.roulette-slot-tuning {
+    flex-basis: 100%;
+    width: 100%;
+    margin-top: 0.4rem;
+    padding: 0.6rem 0.7rem;
+    background: rgba(var(--roulette-bg-rgb), 0.55);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.05);
+}
+
+.roulette-tuning-empty {
+    color: var(--roulette-text-dim);
+    font-style: italic;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 0.4rem;
+}
+
+.roulette-tuning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--roulette-border);
+}
+
+.roulette-tuning-api {
+    color: var(--roulette-text-muted);
+    font-size: 0.78rem;
+    margin-left: auto;
+}
+
+.roulette-tuning-api code {
+    color: var(--roulette-accent);
+    background: rgba(var(--roulette-accent-rgb), 0.08);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 0.92em;
+}
+
+.roulette-tuning-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--roulette-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.roulette-tuning-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.roulette-tuning-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.roulette-tuning-param {
+    display: grid;
+    grid-template-columns: 8em 1fr 5em auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.roulette-tuning-param-label {
+    color: var(--roulette-text-muted);
+    font-size: 0.85rem;
+}
+
+.roulette-tuning-slider {
+    width: 100%;
+    margin: 0;
+}
+
+.roulette-tuning-number {
+    width: 5em;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+}
+
+.roulette-tuning-clear {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--roulette-text-dim);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.roulette-tuning-clear:hover {
+    color: var(--roulette-text);
+    background: rgba(var(--roulette-text-rgb), 0.06);
+    border-color: var(--roulette-border-strong);
+}
+
 .roulette-weighted-footer {
     border-top: 1px solid var(--SmartThemeBorderColor);
     padding-top: 0.5rem;
@@ -973,6 +1090,16 @@
     color: var(--roulette-bg);
     border-color: var(--roulette-accent);
     font-weight: 600;
+}
+
+.roulette-tag-tuned {
+    color: var(--roulette-accent);
+    border-color: var(--roulette-accent-soft);
+    background: rgba(var(--roulette-accent-rgb), 0.1);
+}
+
+.roulette-tag-tuned i {
+    margin-right: 0.2em;
 }
 
 /* Action row revealed on hover. Slides up from the bottom edge. */

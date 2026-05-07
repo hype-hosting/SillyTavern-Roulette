@@ -18,6 +18,7 @@ import {
     rollSlotResponses,
 } from './rotation.js';
 import { switchProfile, isInternalSwitch, profileExists } from './profileSwitcher.js';
+import { applyTuningOnSwitch } from './sampling.js';
 
 /**
  * Per-rotation transient state, kept in-memory only:
@@ -85,6 +86,9 @@ export async function startRotation(queueId) {
             stopRotation();
             return { ok: false, error: `Failed to switch to "${slot.profileName}" and could not recover.` };
         }
+    } else {
+        // Profile applied OK — overlay the slot's sampler tuning if any.
+        await applyTuningOnSwitch(slot, queue);
     }
     notifyStateChanged();
     return { ok: true };
@@ -157,6 +161,8 @@ export async function skipCurrentSlot() {
             stopRotation();
             return { ok: false, error: `Skip failed and recovery exhausted.` };
         }
+    } else {
+        await applyTuningOnSwitch(slot, queue);
     }
     notifyStateChanged();
     return { ok: true };
@@ -194,6 +200,7 @@ async function tryAdvanceFromFailure(queue, lastFailedIndex) {
         consecutiveFailures++;
         return tryAdvanceFromFailure(queue, next.slotIndex);
     }
+    await applyTuningOnSwitch(slot, queue);
     updateChatState(s => {
         s.currentSlotId = next.slotId;
         s.responsesRemaining = next.responses;
@@ -282,6 +289,8 @@ async function onGenerationStarted(type, _options, dryRun) {
             failedSlotIndices.add(next.slotIndex);
             consecutiveFailures++;
             await tryAdvanceFromFailure(queue, next.slotIndex);
+        } else {
+            await applyTuningOnSwitch(slot, queue);
         }
         notifyStateChanged();
     })();
