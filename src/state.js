@@ -26,6 +26,13 @@ function defaultSettings() {
         ui: {
             animScale: 1,        // 0.25 - 2 (multiplier for every animation duration)
             accentColor: null,   // null = default brass; otherwise a CSS color string
+            widget: {
+                enabled: false,    // floating widget toggled on?
+                collapsed: false,  // small dice-icon dot vs full panel
+                x: null,           // viewport-pixel position; null = first-time default
+                y: null,
+                historyOpen: false, // is the history dropdown expanded?
+            },
         },
     };
 }
@@ -45,6 +52,16 @@ export function getSettings() {
     if (!s.ui || typeof s.ui !== 'object') s.ui = { animScale: 1, accentColor: null };
     if (typeof s.ui.animScale !== 'number') s.ui.animScale = 1;
     if (s.ui.accentColor === undefined) s.ui.accentColor = null;
+    // Backfill widget block — old installs don't have it.
+    if (!s.ui.widget || typeof s.ui.widget !== 'object') {
+        s.ui.widget = { enabled: false, collapsed: false, x: null, y: null, historyOpen: false };
+    }
+    const w = s.ui.widget;
+    if (typeof w.enabled !== 'boolean') w.enabled = false;
+    if (typeof w.collapsed !== 'boolean') w.collapsed = false;
+    if (w.x !== null && typeof w.x !== 'number') w.x = null;
+    if (w.y !== null && typeof w.y !== 'number') w.y = null;
+    if (typeof w.historyOpen !== 'boolean') w.historyOpen = false;
     return s;
 }
 
@@ -157,9 +174,13 @@ export function applyUiSettings() {
     if (ui.accentColor) {
         const rgb = parseColor(ui.accentColor);
         if (rgb) {
+            const tuple = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
             lines.push(`    --roulette-accent: ${ui.accentColor};`);
-            lines.push(`    --roulette-glow: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.45);`);
-            lines.push(`    --roulette-glow-strong: rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.75);`);
+            lines.push(`    --roulette-accent-rgb: ${tuple};`);
+            // Glow variants now reference the tuple, so glow tracks accent
+            // automatically — no separate rgba() recomputation per opacity.
+            lines.push(`    --roulette-glow: rgba(var(--roulette-accent-rgb), 0.45);`);
+            lines.push(`    --roulette-glow-strong: rgba(var(--roulette-accent-rgb), 0.75);`);
             // Soft variant for subtler accents (chamber border on idle, hub).
             const soft = mixWithBg(rgb, 0.65);
             lines.push(`    --roulette-accent-soft: rgb(${soft.r}, ${soft.g}, ${soft.b});`);

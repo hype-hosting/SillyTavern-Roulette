@@ -13,6 +13,7 @@
 import { getSettings, findQueue, getChatState } from '../state.js';
 import { startRotation, stopRotation, resumeRotation, skipCurrentSlot, onRotationStateChanged } from '../events.js';
 import { openRouletteModal } from './modal.js';
+import { setWidgetEnabled } from './widget.js';
 
 let mounted = false;
 let rootEl = null;
@@ -31,6 +32,12 @@ export function mountSettingsPanel() {
 
     rootEl.querySelector('[data-action="open-modal"]').addEventListener('click', () => {
         openRouletteModal();
+    });
+    rootEl.querySelector('[data-action="toggle-widget"]').addEventListener('click', () => {
+        const ui = getSettings().ui;
+        const next = !ui.widget?.enabled;
+        setWidgetEnabled(next);
+        render();
     });
     rootEl.querySelector('[data-action="start"]').addEventListener('click', async () => {
         const sel = rootEl.querySelector('[data-field="start-queue"]');
@@ -98,6 +105,11 @@ function render() {
     rootEl.querySelector('[data-action="stop"]').classList.toggle('hidden', !state.activeQueueId);
     rootEl.querySelector('[data-action="skip"]').classList.toggle('hidden', !state.activeQueueId);
     rootEl.querySelector('[data-action="resume"]').classList.toggle('hidden', !state.manuallyOverridden);
+
+    // Widget toggle button label reflects current pinned state.
+    const widgetEnabled = !!settings.ui?.widget?.enabled;
+    const widgetLabel = rootEl.querySelector('[data-field="widget-label"]');
+    if (widgetLabel) widgetLabel.textContent = widgetEnabled ? 'Unpin widget' : 'Pin widget';
 }
 
 function template() {
@@ -127,6 +139,10 @@ function template() {
                 <div class="roulette-row-actions">
                     <button class="menu_button" data-action="open-modal" type="button">
                         <i class="fa-solid fa-circle-dot"></i> Open Roulette
+                    </button>
+                    <button class="menu_button" data-action="toggle-widget" type="button"
+                            title="Pin a small floating widget to the screen during chat">
+                        <i class="fa-solid fa-thumbtack"></i> <span data-field="widget-label">Pin widget</span>
                     </button>
                 </div>
             </div>
