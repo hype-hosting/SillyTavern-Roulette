@@ -200,27 +200,54 @@ function wireDrag() {
         dragState = {
             offsetX: e.clientX - rect.left,
             offsetY: e.clientY - rect.top,
+            startX: e.clientX,
+            startY: e.clientY,
+            moved: false,
             pointerId: e.pointerId,
         };
-        widgetEl.classList.add('roulette-widget-dragging');
         try { handle.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         e.preventDefault();
     });
 
     handle.addEventListener('pointermove', (e) => {
         if (!dragState || dragState.pointerId !== e.pointerId) return;
-        const x = e.clientX - dragState.offsetX;
-        const y = e.clientY - dragState.offsetY;
-        moveTo(x, y, /*persist=*/false);
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        // Only treat the gesture as a drag once the pointer crosses a
+        // small threshold — keeps a tap-and-release on the collapsed dot
+        // from being misread as a zero-length drag (which suppresses the
+        // native click event on pointer-captured elements).
+        if (!dragState.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            dragState.moved = true;
+            widgetEl.classList.add('roulette-widget-dragging');
+        }
+        if (dragState.moved) {
+            const x = e.clientX - dragState.offsetX;
+            const y = e.clientY - dragState.offsetY;
+            moveTo(x, y, /*persist=*/false);
+        }
     });
 
     const endDrag = (e) => {
         if (!dragState || dragState.pointerId !== e.pointerId) return;
-        const rect = widgetEl.getBoundingClientRect();
-        moveTo(rect.left, rect.top, /*persist=*/true);
+        const wasDrag = dragState.moved;
+        const target = e.target;
+        if (wasDrag) {
+            const rect = widgetEl.getBoundingClientRect();
+            moveTo(rect.left, rect.top, /*persist=*/true);
+        }
         widgetEl.classList.remove('roulette-widget-dragging');
         try { handle.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
         dragState = null;
+
+        // Tap (not drag): if the widget is collapsed, expand it. Pointer
+        // capture suppresses the would-be native click on the icon, so we
+        // synthesise the click behaviour here. Skip if the tap landed on
+        // an action button — those have their own handlers.
+        if (!wasDrag && !target?.closest?.('button')
+            && widgetEl.classList.contains('roulette-widget-collapsed')) {
+            toggleCollapsed();
+        }
     };
     handle.addEventListener('pointerup', endDrag);
     handle.addEventListener('pointercancel', endDrag);
@@ -239,13 +266,10 @@ function wireActions() {
     widgetEl.querySelector('[data-action="hide"]').addEventListener('click', () => setWidgetEnabled(false));
     widgetEl.querySelector('[data-action="toggle-history"]').addEventListener('click', toggleHistory);
 
-    // Click on the collapsed icon expands. Click on the cylinder area in
-    // expanded mode opens the modal at the Chamber tab.
-    widgetEl.querySelector('.roulette-widget-collapsed-icon').addEventListener('click', (e) => {
-        if (!widgetEl.classList.contains('roulette-widget-collapsed')) return;
-        e.stopPropagation();
-        toggleCollapsed();
-    });
+    // Click on the cylinder area in expanded mode opens the modal at the
+    // Chamber tab. (The collapsed-state expand-on-click is handled in
+    // wireDrag's endDrag — pointer capture would suppress the native
+    // click here.)
     widgetEl.querySelector('[data-field="cylinder-host"]').addEventListener('click', () => {
         if (widgetEl.classList.contains('roulette-widget-collapsed')) return;
         openRouletteModal('chamber');
