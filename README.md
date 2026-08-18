@@ -4,7 +4,7 @@
 
 **A premium connection-profile rotation extension for SillyTavern by Hyperion.**
 
-Roulette rotates between SillyTavern connection profiles during a chat — sequentially or by weighted random — so you can mix models, parameters, and providers without manually switching. Built around a glassy revolver-cylinder visualisation that turns the rotation into a moment, not a menu.
+Roulette rotates between SillyTavern connection profiles during a chat — sequentially or by weighted random — so you can mix models, parameters, and providers without manually switching. A slim pinned bar in the chat shows the rotation as a line of colored dots — one per slot, with the live slot lit up and counting down — so you always know what's talking and what's next.
 
 [![Ko-fi](https://img.shields.io/badge/Support%20on-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/hype)
 [![Discord](https://img.shields.io/badge/Join%20the-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/therealhype)
@@ -40,12 +40,12 @@ Manual install: clone into `data/<user>/extensions/SillyTavern-Roulette/` (per-u
 A 3-model rotation in five steps. Assumes Roulette is installed.
 
 1. **Define three connection profiles** in SillyTavern's Connection Profiles UI. Pick three different models you want in the mix — e.g. `Sonnet 4.5`, `GLM-4.7`, `DeepSeek v3`. Give them clear names; you'll pick from these names in step 3.
-2. **Open the Roulette modal** — click the dice icon next to the chat input, or the **Open Roulette** button in the Extensions drawer.
-3. **Queues tab → New queue.** Name it (e.g. *Long-fiction blend*). Pick **Sequential** mode, drag in your three profiles, set each slot's count (try `Sonnet=3`, `GLM=2`, `DeepSeek=4`).
-4. **Save.** The queue appears as a card with a mini-cylinder preview. Click **Simulate 20 picks** in the editor first if you want to sanity-check the sequence.
-5. **Chamber tab → Spin** (or use the drawer's queue picker + Start). The cylinder loads, and from now on each AI response rotates through the chambers automatically.
+2. **Open Roulette** — click the gear on the Roulette bar above the message input, or **Settings** in the Extensions drawer.
+3. **Queues tab → New queue.** Name it (e.g. *Long-fiction blend*). Pick **Sequential** mode, add your three profiles, set each slot's count (try `Sonnet=3`, `GLM=2`, `DeepSeek=4`).
+4. **Save.** The queue appears as a card with a dot-strip preview. Click **Simulate 20 picks** in the editor first if you want to sanity-check the sequence.
+5. **Press ▶ on the bar.** The dots light up, and from now on each AI response advances the rotation automatically.
 
-The pill in the chat input shows the active queue and how many responses remain in the current slot. Hover for detail; click to reopen the modal.
+The bar shows the whole rotation at a glance: one dot per slot in queue order, the active slot lit with the number of responses it has left, plus Skip and Stop. If you'd rather not see it, **Disable Roulette** in the Extensions drawer hides it without stopping anything.
 
 ---
 
@@ -108,7 +108,7 @@ whimsical fae shopkeeper rarely benefit from the same blend of models.
 
 Bind a queue to a character once and it starts itself from then on:
 
-- **In the modal** — open **Chamber** while that character's chat is loaded and
+- **In the modal** — open **Rotation** while that character's chat is loaded and
   pick a queue from **Auto-start for _character_**.
 - **From a queue** — in **Queues**, click the characters icon on a queue card
   and tick every character that should use it.
@@ -148,10 +148,9 @@ Renaming or deleting a character updates or removes its binding automatically.
 
 | Tab | What it is |
 |---|---|
-| **Chamber** | The live cylinder. Brass collar around glassy chambers; active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration. Below it, an **Auto-start for _character_** picker binds the current character to a queue. |
-| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). The characters icon opens a picker — bind many characters to one queue at once. Import / export as JSON for sharing. |
-| **History** | Every AI response logged with its profile of origin. Trail strip shows the last twelve, full list newest-first. |
-| **Settings** | Animation speed slider (0.25× to 2×), accent-colour picker (six metal presets + custom), profile-palette display. |
+| **Rotation** | The live dot strip — one dot per slot, active slot glowing with its responses-remaining count — plus Start / Skip / Stop / Resume, an **Auto-start for _character_** picker, and the pick history: a trail strip of recent picks and a full newest-first log of which profile wrote which message. |
+| **Queues** | Card grid of saved queues, each with a dot-strip preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). The characters icon opens a picker — bind many characters to one queue at once. Import / export as JSON for sharing. |
+| **Settings** | Pinned bar visibility + position (above the message bar, below it, or above the chat), animation speed slider (0.25× to 2×), accent-colour picker, profile-palette display. |
 
 ---
 
@@ -172,7 +171,8 @@ Renaming or deleting a character updates or removes its binding automatically.
 
 | Version | Status | Notes |
 |---|---|---|
-| v1.3 | **Current** | Per-character queue bindings — open a character's chat, their queue starts itself. |
+| v2.0 | **Current** | Full UI redesign — the revolver cylinder, floating widget, and chat-input pill are replaced by a linear dot strip and a slim pinned bar (position configurable). Cool near-black theme, denser modal, three tabs. |
+| v1.3 | | Per-character queue bindings — open a character's chat, their queue starts itself. |
 | v1.2 | | Inline sampler tuning per slot, overlaid through SillyTavern's preset system. |
 | v1.1 | | Floating draggable widget mirroring the cylinder during chat; glassmorphism pass. |
 | v1.0 | | Initial public release. Modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, animation/accent settings. |

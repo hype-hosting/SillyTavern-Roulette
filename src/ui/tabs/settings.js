@@ -2,30 +2,59 @@
  *
  * Settings tab. Persists into extension_settings.roulette.ui via state.js.
  * applyUiSettings() injects a global <style> override so changes take
- * effect immediately without re-rendering the cylinder.
+ * effect immediately without re-rendering anything.
  *
- * Settings shipped:
- *   - Animation scale: 0.25× to 2× multiplier on every keyframe / transition
- *   - Accent colour: defaults to brass; user can override with any CSS colour
+ * Sections:
+ *   - Pinned bar: show/hide + where it mounts (three-way segmented control)
+ *   - Animation speed: 0.25× to 2× multiplier on every transition
+ *   - Accent colour: chrome accent (active tab, buttons, section rules)
+ *   - Profile palette: read-only swatch row of the hash-assigned dot colours
  */
 
-import { getSettings, persistSettings, applyUiSettings } from '../../state.js';
+import { getSettings, persistSettings, applyUiSettings, BAR_POSITIONS } from '../../state.js';
 import { profileColorPalette } from '../profileColors.js';
-import { setWidgetEnabled, resetWidgetPosition } from '../widget.js';
+import { setBarEnabled, setBarPosition, isBarEnabled } from '../bar.js';
 
-const DEFAULT_ACCENT = '#c7a461';
+const DEFAULT_ACCENT = '#8fa4c4';
 const PRESETS = [
-    { name: 'Brass',     value: '#c7a461' },
-    { name: 'Copper',    value: '#d99c66' },
-    { name: 'Emerald',   value: '#6fbf73' },
-    { name: 'Crimson',   value: '#d96666' },
-    { name: 'Amethyst',  value: '#b87dd9' },
-    { name: 'Steel',     value: '#9aa6b2' },
+    { name: 'Steel',    value: '#8fa4c4' },
+    { name: 'Blue',     value: '#6ea8fe' },
+    { name: 'Green',    value: '#5ed3a0' },
+    { name: 'Violet',   value: '#c79bff' },
+    { name: 'Amber',    value: '#ffc861' },
+    { name: 'Rose',     value: '#ff8fc7' },
 ];
+
+const POSITION_LABELS = {
+    'above-input': 'Above message bar',
+    'below-input': 'Below message bar',
+    'above-chat':  'Above chat',
+};
 
 export function mountSettingsTab(container) {
     container.innerHTML = `
         <div class="roulette-settings-layout">
+
+            <div class="roulette-section">
+                <div class="roulette-section-title-row">
+                    <div class="roulette-section-title">Pinned bar</div>
+                    <label class="roulette-toggle">
+                        <input type="checkbox" data-field="bar-enabled" />
+                        <span data-field="bar-enabled-label">Shown</span>
+                    </label>
+                </div>
+                <div class="roulette-segmented" data-field="bar-position" role="radiogroup" aria-label="Bar position">
+                    ${BAR_POSITIONS.map(pos => `
+                        <button type="button" class="roulette-segment" data-position="${pos}" role="radio">
+                            ${POSITION_LABELS[pos]}
+                        </button>
+                    `).join('')}
+                </div>
+                <p class="roulette-help">
+                    The bar shows the rotation dots, current profile, and Skip / Stop during
+                    chat. Hiding it never stops a running rotation — it only removes the chrome.
+                </p>
+            </div>
 
             <div class="roulette-section">
                 <div class="roulette-section-title-row">
@@ -39,10 +68,6 @@ export function mountSettingsTab(container) {
                     <span>Default</span>
                     <span>Fast</span>
                 </div>
-                <p class="roulette-help">
-                    Multiplies every animation duration. Drop to 0.5× for slow-cinematic spins
-                    or 2× for instant-on. Drag to feel it live.
-                </p>
             </div>
 
             <div class="roulette-section">
@@ -58,35 +83,18 @@ export function mountSettingsTab(container) {
                     </button>
                 </div>
                 <p class="roulette-help">
-                    Recolours the cylinder's metal — chamber borders, halos, glow, and accent
-                    text. Pick a preset or use the colour picker.
+                    Tints the chrome — active tab, buttons, section rules. Profile dots keep
+                    their own colours regardless.
                 </p>
             </div>
 
             <div class="roulette-section">
                 <div class="roulette-section-title">Profile palette</div>
-                <p class="roulette-help">
-                    Each connection profile gets a stable colour from this palette, assigned by
-                    a hash of its name. Same profile, same colour, every chat.
-                </p>
                 <div class="roulette-palette-row" data-field="palette"></div>
-            </div>
-
-            <div class="roulette-section">
-                <div class="roulette-section-title">Floating widget</div>
                 <p class="roulette-help">
-                    A draggable on-screen panel that mirrors the cylinder during chat. Click the
-                    cylinder area to open this modal at the Chamber tab; click the chevron to
-                    expand recent picks. Desktop only.
+                    Each connection profile gets a stable colour from this palette, assigned
+                    by a hash of its name. Same profile, same colour, every chat.
                 </p>
-                <div class="roulette-row-actions">
-                    <button type="button" class="roulette-action" data-act="toggle-widget">
-                        <i class="fa-solid fa-thumbtack"></i><span data-field="widget-toggle-label">Pin widget</span>
-                    </button>
-                    <button type="button" class="roulette-action" data-act="reset-widget-pos">
-                        <i class="fa-solid fa-arrows-to-dot"></i><span>Reset position</span>
-                    </button>
-                </div>
             </div>
 
         </div>
@@ -98,6 +106,19 @@ export function mountSettingsTab(container) {
     const colorInput = container.querySelector('[data-field="accent-color"]');
     const presetsRow = container.querySelector('[data-field="accent-presets"]');
     const paletteRow = container.querySelector('[data-field="palette"]');
+    const barEnabled = container.querySelector('[data-field="bar-enabled"]');
+    const positionGroup = container.querySelector('[data-field="bar-position"]');
+
+    barEnabled.addEventListener('change', () => {
+        setBarEnabled(barEnabled.checked);
+        syncBarControls(container);
+    });
+    positionGroup.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-position]');
+        if (!btn) return;
+        setBarPosition(btn.dataset.position);
+        syncBarControls(container);
+    });
 
     animSlider.value = String(ui.animScale ?? 1);
     animValue.textContent = `${Number(animSlider.value).toFixed(2)}×`;
@@ -125,21 +146,7 @@ export function mountSettingsTab(container) {
         renderPresets(ui, presetsRow, colorInput);
     });
 
-    const widgetToggleBtn = container.querySelector('[data-act="toggle-widget"]');
-    const widgetToggleLabel = container.querySelector('[data-field="widget-toggle-label"]');
-    function syncWidgetLabel() {
-        widgetToggleLabel.textContent = ui.widget?.enabled ? 'Unpin widget' : 'Pin widget';
-        widgetToggleBtn.classList.toggle('roulette-action-go', !!ui.widget?.enabled);
-    }
-    syncWidgetLabel();
-    widgetToggleBtn.addEventListener('click', () => {
-        setWidgetEnabled(!ui.widget?.enabled);
-        syncWidgetLabel();
-    });
-    container.querySelector('[data-act="reset-widget-pos"]').addEventListener('click', () => {
-        resetWidgetPosition();
-    });
-
+    syncBarControls(container);
     renderPresets(ui, presetsRow, colorInput);
     renderPalette(paletteRow);
 }
@@ -157,6 +164,25 @@ export function refreshSettingsTab(container) {
     if (colorInput) colorInput.value = ui.accentColor ?? DEFAULT_ACCENT;
     const presetsRow = container.querySelector('[data-field="accent-presets"]');
     if (presetsRow) renderPresets(ui, presetsRow, colorInput);
+    syncBarControls(container);
+}
+
+function syncBarControls(container) {
+    const settings = getSettings();
+    const enabled = isBarEnabled();
+    const box = container.querySelector('[data-field="bar-enabled"]');
+    const label = container.querySelector('[data-field="bar-enabled-label"]');
+    const group = container.querySelector('[data-field="bar-position"]');
+    if (!box || !group) return;
+    box.checked = enabled;
+    if (label) label.textContent = enabled ? 'Shown' : 'Hidden';
+    group.classList.toggle('roulette-segmented-disabled', !enabled);
+    group.querySelectorAll('[data-position]').forEach(btn => {
+        const active = btn.dataset.position === settings.ui.bar.position;
+        btn.classList.toggle('roulette-segment-active', active);
+        btn.setAttribute('aria-checked', String(active));
+        btn.disabled = !enabled;
+    });
 }
 
 function renderPresets(ui, host, colorInput) {

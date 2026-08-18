@@ -1,6 +1,8 @@
 # Roulette — manual testing checklist
 
-These walkthrough steps verify each v1 acceptance criterion in a live SillyTavern. Run before tagging a v1 release. Each section maps 1-to-1 with the acceptance criteria in `CLAUDE.md`.
+These walkthrough steps verify each acceptance criterion in a live SillyTavern. Run before tagging a release. Each section maps 1-to-1 with the acceptance criteria in `CLAUDE.md`.
+
+> **v2.0 orientation.** The extension's primary surface is the **pinned bar** — a slim row in the chat column (default: above the message input) showing one colored dot per slot, with the active slot lit and carrying its responses-remaining count. The bar's gear opens the modal (**Rotation / Queues / Settings**). The Extensions drawer holds only **Enable/Disable Roulette** (bar visibility) and **Settings** (opens the modal). Wherever an old step said "pill", read "bar".
 
 ## Setup
 
@@ -8,7 +10,7 @@ These walkthrough steps verify each v1 acceptance criterion in a live SillyTaver
 2. Define at least three connection profiles in **Connection Profiles** (any three providers/models — they're labels for these tests). Suggested names: `A`, `B`, `C`.
 3. Install Roulette via **Extensions → Install Extension → Install from URL** with this repository's URL.
 4. Hard-refresh the browser (`Cmd-Shift-R` / `Ctrl-Shift-R`) to bypass any stale `manifest.json` cache.
-5. Open DevTools Console. You should see seven `[Roulette] ...` log lines ending with `init() complete`. No red errors anywhere.
+5. Open DevTools Console. You should see the `[Roulette] ...` init log lines ending with `init() complete`. No red errors anywhere.
 
 If init never logs, see `CLAUDE.md` → "Robustness pattern — self-invoke from top level".
 
@@ -20,19 +22,19 @@ If init never logs, see `CLAUDE.md` → "Robustness pattern — self-invoke from
 
 ## Criterion 2 — Roulette panel appears in the Extensions drawer
 
-**Pass:** Open the wand → Extensions drawer (or the gear icon panel). A collapsible block titled **Roulette** is present.
+**Pass:** Open the wand → Extensions drawer (or the gear icon panel). A collapsible block titled **Roulette** is present, containing exactly two buttons: **Disable Roulette** (or **Enable Roulette**) and **Settings**. The pinned bar is visible in the chat column.
 
 ## Criterion 3 — Create, save, activate a queue
 
-1. In the Roulette block click **New queue**.
+1. Open the modal (bar gear or drawer **Settings**) → **Queues** tab → **New queue**.
 2. Name it `seq-test`. Mode: `Sequential`.
 3. Slot 1: profile `A`, count fixed = 3.
 4. Slot 2: profile `B`, count fixed = 2.
 5. Slot 3: profile `C`, count fixed = 4.
-6. Click **Save**. The queue appears in the list.
-7. Pick `seq-test` from the start dropdown, click **Start**.
+6. Click **Save**. The queue appears as a card with a three-dot preview.
+7. Close the modal. On the bar, make sure `seq-test` is selected in the queue picker, then press **▶**.
 
-**Pass:** Pill changes from dimmed to active and reads `seq-test · A · 3`.
+**Pass:** The bar's dots go from hollow to lit; the first dot grows into a capsule showing `3`; the label shows profile `A`.
 
 ## Criterion 4 — Sequential rotation produces correct sequence
 
@@ -41,7 +43,7 @@ Continuing from C3.
 1. Send 9 normal user messages.
 2. Before each AI generation, glance at ST's connection-profile selector (top of API panel).
 
-**Pass:** The selector shows the sequence `A, A, A, B, B, C, C, C, C` across the 9 generations. The pill counter ticks `3 → 2 → 1` then resets to `2 → 1` then `4 → 3 → 2 → 1`.
+**Pass:** The selector shows the sequence `A, A, A, B, B, C, C, C, C` across the 9 generations. The active-dot counter ticks `3 → 2 → 1`, then the second dot lights with `2 → 1`, then the third with `4 → 3 → 2 → 1` — the lit dot walking left to right.
 
 ## Criterion 5 — Swiping does not advance the counter
 
@@ -59,7 +61,7 @@ Continuing from C3.
 
 1. Create a queue `wr-test`, mode **Weighted random**, three slots all with weight `1`. Run length: fixed `1`. No-repeat-in-row: **off** for this test.
 2. Activate it.
-3. Send 100+ normal messages (or use a script). Watch the pill cycle.
+3. Send 100+ normal messages (or use a script). Watch the bar cycle.
 4. After 100, sample the per-profile counts mentally — each should be roughly 33 ± 6.
 
 **Pass:** Across 100 picks, no profile is conspicuously over- or under-represented. (For a precise test, run the offline math sanity script in this repo's history — it confirms 33.3% ± 0.2pp over 100k.)
@@ -67,15 +69,15 @@ Continuing from C3.
 ## Criterion 8 — `noRepeatInRow` holds
 
 1. Edit `wr-test`: enable **Don't repeat the same profile twice in a row**. Save. Restart rotation.
-2. Send 50+ messages, watching the pill.
+2. Send 50+ messages, watching the bar.
 
-**Pass:** The profile name in the pill is never the same on two consecutive generations.
+**Pass:** The profile name on the bar is never the same on two consecutive generations.
 
 ## Criterion 9 — Per-chat state independence
 
 1. With `seq-test` running on Chat A, switch to a different chat (Chat B).
-2. In Chat B, the pill should be dimmed (rotation off).
-3. Start `wr-test` on Chat B.
+2. In Chat B, the bar should show hollow idle dots (rotation off).
+3. Start `wr-test` on Chat B from the bar.
 4. Switch back to Chat A.
 
 **Pass:** Chat A still shows `seq-test` running with its own counter; Chat B shows `wr-test`. State did not bleed between chats.
@@ -84,11 +86,11 @@ Continuing from C3.
 
 1. With rotation active, manually pick a different connection profile from ST's selector.
 
-**Pass:** Pill changes to indicate `paused` (text includes "paused"). The status block in the Extensions drawer also shows `(paused: manual override)`. A **Resume** button is visible (in the popover and the settings block).
+**Pass:** The bar's dots dim and desaturate, the label reads `paused`, and the Stop button swaps to **Resume**. The modal's Rotation tab shows the same paused state.
 
-2. Click **Resume**.
+2. Click **Resume** (on the bar or in the Rotation tab).
 
-**Pass:** Pill returns to active state. Next generation uses the slot's profile.
+**Pass:** The dots re-light. Next generation uses the slot's profile.
 
 ## Criterion 11 — Profile-deletion error path
 
@@ -101,7 +103,7 @@ Continuing from C3.
 
 ## Criterion 12 — Status indicator updates within one frame
 
-Subjective: with rotation active and counter `> 1`, send a message; the pill counter ticks down visibly without lag perceptible to the eye.
+Subjective: with rotation active and counter `> 1`, send a message; the number inside the active dot ticks down visibly without lag perceptible to the eye.
 
 **Pass:** No noticeable delay between message receipt and counter update.
 
@@ -110,9 +112,9 @@ Subjective: with rotation active and counter `> 1`, send a message; the pill cou
 In the chat input, type each command:
 
 - `/roulette-status` → echoes `Roulette: off` or `Roulette: <queue> · <profile> · N left`.
-- `/roulette-start seq-test` → activates `seq-test`. Pill becomes active.
-- `/roulette-skip` → forces an immediate slot advance. Pill profile changes; counter resets to the new slot's count.
-- `/roulette-stop` → deactivates. Pill dims.
+- `/roulette-start seq-test` → activates `seq-test`. The bar lights up.
+- `/roulette-skip` → forces an immediate slot advance. The lit dot moves; counter resets to the new slot's count.
+- `/roulette-stop` → deactivates. The bar returns to hollow idle dots.
 - `/roulette-bind seq-test` → binds the current character. Echoes `seq-test`.
 - `/roulette-unbind` → removes it. Echoes the queue name that was unbound.
 
@@ -124,16 +126,20 @@ Use Roulette normally for 5–10 minutes (start, stop, swipe, regen, switch chat
 
 **Pass:** No red errors in the DevTools Console. Warnings related to ST itself (not Roulette) are acceptable. Any `[Roulette] ...` warnings should be intentional (e.g. profile-skipped on deletion).
 
-## Criterion 15 — Light + dark theme
+## Criterion 15 — Theme independence
 
-Deferred to the v1 release styling pass. The current scaffolded styles use ST CSS variables (`--SmartThemeBodyColor`, `--SmartThemeBlurTintColor`, `--SmartThemeBorderColor`) so they should at minimum be readable in both, but no manual audit has been done yet.
+The modal and bar own their cool near-black canvas (`--roulette-*` tokens) and must render identically under any ST theme. The Extensions-drawer block is the one ST-themed surface.
+
+1. Switch ST between a light theme and a dark theme.
+
+**Pass:** Modal and bar look the same under both; the drawer block follows the ST theme; nothing becomes unreadable.
 
 ## Criterion 16 — Per-character binding auto-starts
 
 Requires two character cards (call them **Alice** and **Bob**) and two queues.
 
-1. Open Alice's chat. In the modal's **Chamber** tab, set **Auto-start for Alice** to `seq-test`.
-   - Rotation should start immediately — the profile switches and the pill goes active.
+1. Open Alice's chat. In the modal's **Rotation** tab, set **Auto-start for Alice** to `seq-test`.
+   - Rotation should start immediately — the profile switches and the bar goes active.
 2. Switch to Bob's chat (no binding). Rotation should be off.
 3. Switch back to Alice, into a **new** chat.
    - `seq-test` starts on its own before the first generation.
@@ -154,8 +160,8 @@ The two rules that keep auto-start out of the user's way:
 ## Criterion 18 — Binding lifecycle
 
 1. Bind Alice to a queue, then **delete that queue** in the Queues tab.
-   Reopen Alice's chat — no rotation starts, no console error, and the Chamber
-   dropdown reads "Nothing".
+   Reopen Alice's chat — no rotation starts, no console error, and the Rotation
+   tab's binding dropdown reads "Nothing".
 2. Bind Alice to a queue, then **rename Alice** in ST. Reopen her chat —
    the binding still applies under her new name.
 3. Bind Alice, then **delete Alice**. The queue card's binding count drops.
@@ -166,7 +172,7 @@ The two rules that keep auto-start out of the user's way:
 
 Open a group chat.
 
-- The Chamber tab's **Auto-start for…** row is hidden entirely.
+- The Rotation tab's **Auto-start for…** row is hidden entirely.
 - `/roulette-bind seq-test` warns that bindings don't apply to group chats.
 - No rotation auto-starts, regardless of member bindings.
 
@@ -181,6 +187,34 @@ In the Queues tab, click the characters icon on a queue card.
 - Ticking one and saving rebinds it; the card's count chip updates.
 
 **Pass:** Bindings round-trip correctly and conflicts are visible before saving.
+
+## Criterion 21 — Bar visibility toggle (v2.0)
+
+1. With a rotation running, click **Disable Roulette** in the Extensions drawer.
+   - The bar disappears. Send a message: the rotation still advances (verify via
+     `/roulette-status` and ST's profile selector).
+2. Click **Enable Roulette**.
+   - The bar reappears, already showing the live rotation state.
+
+**Pass:** Visibility toggles freely; the rotation itself is never affected.
+
+## Criterion 22 — Bar position (v2.0)
+
+In the modal's **Settings** tab, cycle the pinned-bar position through all
+three options.
+
+**Pass:** The bar re-mounts above the message input, below it, and above the
+chat log respectively, without a reload and without losing its state. The
+choice survives a page refresh.
+
+## Criterion 23 — v1.x settings migration (v2.0)
+
+On an install upgraded from 1.x (or after hand-writing `ui.widget` /
+`defaultQueueId` keys into `extension_settings.roulette` via the console):
+
+**Pass:** First load migrates silently — `ui.widget.enabled` becomes the bar's
+visibility, `defaultQueueId` becomes `lastQueueId`, the old keys are removed,
+queues and character bindings are untouched, and no console errors appear.
 
 ---
 
