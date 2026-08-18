@@ -168,14 +168,14 @@ function build() {
             <button type="button" class="roulette-bar-btn roulette-bar-btn-go" data-act="start" title="Start rotation" aria-label="Start rotation">
                 <i class="fa-solid fa-play"></i>
             </button>
-            <button type="button" class="roulette-bar-btn" data-act="skip" title="Skip to the next slot" aria-label="Skip to the next slot">
-                <i class="fa-solid fa-forward"></i>
-            </button>
             <button type="button" class="roulette-bar-btn roulette-bar-btn-stop" data-act="stop" title="Stop rotation" aria-label="Stop rotation">
                 <i class="fa-solid fa-stop"></i>
             </button>
             <button type="button" class="roulette-bar-btn roulette-bar-btn-go" data-act="resume" title="Resume rotation" aria-label="Resume rotation">
                 <i class="fa-solid fa-play"></i>
+            </button>
+            <button type="button" class="roulette-bar-btn" data-act="skip" title="Skip to the next slot" aria-label="Skip to the next slot">
+                <i class="fa-solid fa-forward"></i>
             </button>
         </div>
         <div class="roulette-bar-label">
