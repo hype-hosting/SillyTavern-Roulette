@@ -1,0 +1,35 @@
+# Runs Roulette's test suite automatically on GitHub.
+#
+# Triggers on every pull request, and on pushes to main. The suite is the
+# pure scheduling core (tests/rotation.test.mjs) — no browser and no
+# SillyTavern needed, so it runs in a few seconds on a plain Node runner.
+#
+# There are no dependencies to install: `node --test` is built into Node,
+# and package.json declares none. That's why there's no `npm install` step.
+
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege: the job only ever reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node --test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run tests
+        run: npm test

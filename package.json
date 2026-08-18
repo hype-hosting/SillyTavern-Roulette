@@ -1,0 +1,11 @@
+{
+    "name": "sillytavern-roulette",
+    "version": "1.3.0",
+    "private": true,
+    "description": "Rotate between SillyTavern connection profiles during roleplay.",
+    "license": "AGPL-3.0",
+    "type": "module",
+    "scripts": {
+        "test": "node --test tests/*.test.mjs"
+    }
+}

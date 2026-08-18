@@ -9,7 +9,9 @@
  */
 
 import { getSettings, deleteQueue, getChatState, upsertQueue } from '../../state.js';
-import { startRotation, stopRotation } from '../../events.js';
+import { startRotation, stopRotation, reevaluateAutoActivation } from '../../events.js';
+import { bindingCountForQueue } from '../../characterBinding.js';
+import { openBindingPicker } from '../bindingPicker.js';
 import { renderCylinder } from '../cylinder.js';
 import { exportQueue, exportAllQueues, importQueueFile } from '../../exportImport.js';
 import { renderEditorInto } from '../queueEditor.js';
@@ -166,12 +168,14 @@ function buildQueueCard(queue, isActive, tabContainer) {
     const meta = document.createElement('div');
     meta.className = 'roulette-queue-card-meta';
     const hasTuning = (queue.slots ?? []).some(s => s.tuning?.enabled);
+    const boundCount = bindingCountForQueue(queue.id);
     meta.innerHTML = `
         <div class="roulette-queue-card-name" title="${escapeHtml(queue.name)}">${escapeHtml(queue.name)}</div>
         <div class="roulette-queue-card-tags">
             <span class="roulette-tag roulette-tag-mode">${queue.mode}</span>
             <span class="roulette-tag">${queue.slots?.length ?? 0} chambers</span>
             ${hasTuning ? '<span class="roulette-tag roulette-tag-tuned" title="Has inline sampler tuning"><i class="fa-solid fa-sliders"></i> tuned</span>' : ''}
+            ${boundCount ? `<span class="roulette-tag roulette-tag-bound" title="Auto-starts for ${boundCount} character(s)"><i class="fa-solid fa-masks"></i> ${boundCount}</span>` : ''}
             ${isActive ? '<span class="roulette-tag roulette-tag-active">active</span>' : ''}
         </div>
     `;
@@ -185,6 +189,9 @@ function buildQueueCard(queue, isActive, tabContainer) {
         </button>
         <button class="roulette-icon-btn" data-card-act="edit" title="Edit queue">
             <i class="fa-solid fa-pen-to-square"></i>
+        </button>
+        <button class="roulette-icon-btn" data-card-act="bind" title="Auto-start for characters…">
+            <i class="fa-solid fa-masks"></i>
         </button>
         <button class="roulette-icon-btn" data-card-act="duplicate" title="Duplicate">
             <i class="fa-solid fa-copy"></i>
@@ -221,6 +228,14 @@ function buildQueueCard(queue, isActive, tabContainer) {
     });
     actions.querySelector('[data-card-act="edit"]').addEventListener('click', () => {
         renderEditView(tabContainer, queue);
+    });
+    actions.querySelector('[data-card-act="bind"]').addEventListener('click', async () => {
+        const changed = await openBindingPicker(queue);
+        if (!changed) return;
+        // If one of the characters just bound is the one we're chatting with,
+        // apply it to this chat now instead of waiting for a reload.
+        await reevaluateAutoActivation();
+        populateGrid(tabContainer);
     });
     actions.querySelector('[data-card-act="duplicate"]').addEventListener('click', () => {
         const dup = structuredClone(queue);

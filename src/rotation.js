@@ -21,7 +21,8 @@
  *   }
  *   ChatRouletteState = {
  *     activeQueueId, currentSlotId, responsesRemaining,
- *     lastSwitchMessageId, history, manuallyOverridden
+ *     lastSwitchMessageId, history, manuallyOverridden,
+ *     autoBindHandled
  *   }
  */
 
@@ -224,6 +225,10 @@ export function emptyState() {
         lastSwitchMessageId: null,
         history: [],
         manuallyOverridden: false,
+        // True once this chat has settled the question of whether its
+        // character's bound queue should auto-start. Prevents a deliberately
+        // stopped rotation from resurrecting every time the chat is reopened.
+        autoBindHandled: false,
     };
 }
 
@@ -329,4 +334,47 @@ export function validateQueue(queue, availableProfileNames = null) {
         }
     }
     return errors;
+}
+
+/**
+ * Decide what a chat-load should do about a character's bound queue.
+ *
+ * Pure on purpose: the surrounding wiring (reading ST's character list,
+ * firing the switch) is untestable, but these precedence rules are exactly
+ * the part that is easy to get subtly wrong, so they live here where a test
+ * can pin them down.
+ *
+ * The rules, in order:
+ *  - No character context (group chat, or no character loaded) -> nothing.
+ *  - Already settled for this chat -> nothing. This is what stops a rotation
+ *    the user deliberately stopped from restarting on every chat re-open.
+ *  - Chat already has its own rotation running -> never clobber it; just mark
+ *    the question settled so we stop reconsidering it.
+ *  - Binding points at a queue that no longer exists -> drop the stale binding.
+ *  - Otherwise -> start it.
+ *
+ * @param {object} input
+ * @param {boolean} input.hasCharacter    a non-group character is loaded
+ * @param {string|null} input.boundQueueId queue bound to that character
+ * @param {boolean} input.queueExists     the bound queue still resolves
+ * @param {{activeQueueId: string|null, autoBindHandled: boolean}} input.chatState
+ * @returns {{action: 'start'|'mark-handled'|'clear-binding'|'none', reason: string}}
+ */
+export function decideAutoActivation({ hasCharacter, boundQueueId, queueExists, chatState }) {
+    if (!hasCharacter) {
+        return { action: 'none', reason: 'no character context (group chat or nothing loaded)' };
+    }
+    if (!boundQueueId) {
+        return { action: 'none', reason: 'character has no bound queue' };
+    }
+    if (chatState?.autoBindHandled) {
+        return { action: 'none', reason: 'binding already settled for this chat' };
+    }
+    if (chatState?.activeQueueId) {
+        return { action: 'mark-handled', reason: 'chat already has a rotation; leaving it alone' };
+    }
+    if (!queueExists) {
+        return { action: 'clear-binding', reason: 'bound queue no longer exists' };
+    }
+    return { action: 'start', reason: 'starting bound queue for this character' };
 }
