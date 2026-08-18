@@ -278,7 +278,10 @@
 .roulette-bar-label {
     display: flex;
     align-items: center;
-    flex: 1;
+    /* Shrinkable but not growing: the bar's contents cluster at the left
+     * edge (gear, transport, label, dots) and the free space falls to the
+     * right of the dots. */
+    flex: 0 1 auto;
     min-width: 0;
     gap: 0.5rem;
 }
@@ -373,9 +376,10 @@
 .roulette-bar-btn-go:hover   { color: var(--roulette-go); }
 .roulette-bar-btn-stop:hover { color: var(--roulette-stop); }
 
-/* The gear sits slightly apart — it opens the modal, not the rotation. */
+/* The gear leads the bar but sits slightly apart from the transport
+ * buttons — it opens the modal, not the rotation. */
 .roulette-bar-btn-gear {
-    margin-left: 0.25rem;
+    margin-right: 0.25rem;
 }
 
 /* Idle: the bar recedes — quieter border, no inner highlight. Running

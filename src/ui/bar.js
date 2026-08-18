@@ -157,18 +157,16 @@ function build() {
     barEl.className = 'roulette-extension roulette-bar';
     barEl.setAttribute('role', 'region');
     barEl.setAttribute('aria-label', 'Roulette rotation');
+    // Left-to-right: gear, transport (start / skip / stop / resume), queue
+    // label, dots. Controls cluster at the left edge; the dots trail the
+    // label and free space falls to the right.
     barEl.innerHTML = `
-        <div class="roulette-bar-dots" data-field="dots"></div>
-        <div class="roulette-bar-label">
-            <select class="roulette-bar-queue" data-field="queue" aria-label="Queue to start"></select>
-            <span class="roulette-bar-profile" data-field="profile"></span>
-        </div>
         <div class="roulette-bar-actions">
+            <button type="button" class="roulette-bar-btn roulette-bar-btn-gear" data-act="open" title="Open Roulette" aria-label="Open Roulette">
+                <i class="fa-solid fa-gear"></i>
+            </button>
             <button type="button" class="roulette-bar-btn roulette-bar-btn-go" data-act="start" title="Start rotation" aria-label="Start rotation">
                 <i class="fa-solid fa-play"></i>
-            </button>
-            <button type="button" class="roulette-bar-btn" data-act="skip" title="Skip to the next slot" aria-label="Skip to the next slot">
-                <i class="fa-solid fa-forward"></i>
             </button>
             <button type="button" class="roulette-bar-btn roulette-bar-btn-stop" data-act="stop" title="Stop rotation" aria-label="Stop rotation">
                 <i class="fa-solid fa-stop"></i>
@@ -176,10 +174,15 @@ function build() {
             <button type="button" class="roulette-bar-btn roulette-bar-btn-go" data-act="resume" title="Resume rotation" aria-label="Resume rotation">
                 <i class="fa-solid fa-play"></i>
             </button>
-            <button type="button" class="roulette-bar-btn roulette-bar-btn-gear" data-act="open" title="Open Roulette" aria-label="Open Roulette">
-                <i class="fa-solid fa-gear"></i>
+            <button type="button" class="roulette-bar-btn" data-act="skip" title="Skip to the next slot" aria-label="Skip to the next slot">
+                <i class="fa-solid fa-forward"></i>
             </button>
         </div>
+        <div class="roulette-bar-label">
+            <select class="roulette-bar-queue" data-field="queue" aria-label="Queue to start"></select>
+            <span class="roulette-bar-profile" data-field="profile"></span>
+        </div>
+        <div class="roulette-bar-dots" data-field="dots"></div>
     `;
     wire();
 }
