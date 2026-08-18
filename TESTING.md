@@ -174,7 +174,7 @@ Open a group chat.
 
 ## Criterion 20 — Queue-card character picker
 
-In the Queues tab, click the masks icon on a queue card.
+In the Queues tab, click the characters icon on a queue card.
 
 - Every character is listed, filterable by the search box.
 - Characters bound to a *different* queue show a "currently &lt;queue&gt;" chip.

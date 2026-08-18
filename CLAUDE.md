@@ -2,7 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
-**Version:** 1.3.0
+**Version:** 1.3.1
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -260,8 +260,8 @@ the removed queue (done inline in `state.js` — routing it through
 `state.js`).
 
 **UI.** Two surfaces, one map: a contextual `Auto-start for <character>` select
-in the Chamber tab, and a masks-icon character multi-select on each queue card
-in the Queues tab (`src/ui/bindingPicker.js`). A character has at most one
+in the Chamber tab, and a characters-icon multi-select on each queue card in
+the Queues tab (`src/ui/bindingPicker.js`). A character has at most one
 queue, so the picker calls out characters already bound elsewhere rather than
 silently rebinding them.
 
@@ -356,7 +356,7 @@ dependencies — `node --test` is built into Node.
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
@@ -414,6 +414,35 @@ Before firing `/profile <name>`, verify the profile still exists. If it doesn't,
 
 ### Persistence timing
 Persist `chat_metadata.roulette` after every state mutation (post-decrement, post-switch). Persist `extension_settings.roulette` on queue create/edit/delete. Use the debounced helpers; don't write synchronously on every message.
+
+### Icons — Font Awesome 6 Free only
+
+ST bundles **Font Awesome 6 Free** (`public/css/fontawesome.min.css`). Only
+names present in that file render; anything else produces a correctly-sized
+but **completely empty** button, with no console error to point at it.
+
+Two traps:
+
+- **FA5 names that FA6 renamed.** `fa-masks` shipped blank in v1.3 for exactly
+  this reason — FA6 renamed it `fa-masks-theater`, and the bare alias only
+  exists in FA6 *Pro*. (Confusingly `fa-theater-masks` *does* resolve, so
+  "the FA5 name works" is not a reliable rule.)
+- **Pro-only icons.** Plenty of names in Font Awesome's search UI are Pro; the
+  free build is a subset.
+
+Before using an icon, grep the bundled stylesheet for it:
+
+```
+grep -c '\.fa-users:before' public/css/fontawesome.min.css
+```
+
+To audit every icon the extension references at once:
+
+```
+grep -rhoE 'fa-[a-z0-9-]+' --include=*.js --include=*.css . | sort -u
+```
+
+then check each against that stylesheet.
 
 ### Style scoping
 All CSS rules under a single root class (e.g. `.roulette-extension`) to avoid bleeding into ST's UI. The drawer + pill use ST CSS variables (`--SmartThemeBodyColor` etc.) so they blend with chat chrome. The modal owns its own `--roulette-*` token set scoped to `.roulette-extension`, so its identity is stable regardless of ST theme. The user can override `--roulette-accent`, `--roulette-glow`, and `--roulette-glow-strong` via the Settings tab; `applyUiSettings()` (in `state.js`) writes them into a single `<style id="roulette-ui-overrides">` block in `<head>`.
