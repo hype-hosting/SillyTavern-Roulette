@@ -1,9 +1,13 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
- * Modal chassis. Tabbed full-screen modal owned by ST's Popup class so we
- * inherit z-index, focus trap, and ESC-to-close. Tab content is rendered
- * by separate modules under src/ui/tabs/. Open state is global; switching
+ * Modal chassis. Tabbed modal owned by ST's Popup class so we inherit
+ * z-index, focus trap, and ESC-to-close. Tab content is rendered by
+ * separate modules under src/ui/tabs/. Open state is global; switching
  * chats does not close it.
+ *
+ * v2.0: three tabs — Rotation (live status + pick history), Queues,
+ * Settings. The old Chamber and History tabs merged into Rotation when the
+ * cylinder went away.
  *
  * Public API:
  *   openRouletteModal(tab?)   — open (optionally jump to a tab)
@@ -11,23 +15,21 @@
  *   isModalOpen()             — boolean
  */
 
-import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup.js';
-import { mountChamberTab, refreshChamberTab } from './tabs/chamber.js';
+import { Popup, POPUP_TYPE } from '../../../../../../scripts/popup.js';
+import { mountRotationTab, refreshRotationTab } from './tabs/rotation.js';
 import { mountQueuesTab, refreshQueuesTab } from './tabs/queues.js';
-import { mountHistoryTab, refreshHistoryTab } from './tabs/history.js';
 import { mountSettingsTab, refreshSettingsTab } from './tabs/settings.js';
 import { onRotationStateChanged } from '../events.js';
 
 const TABS = [
-    { id: 'chamber',  label: 'Chamber',  icon: 'fa-circle-dot',     mount: mountChamberTab,  refresh: refreshChamberTab },
-    { id: 'queues',   label: 'Queues',   icon: 'fa-layer-group',    mount: mountQueuesTab,   refresh: refreshQueuesTab },
-    { id: 'history',  label: 'History',  icon: 'fa-clock-rotate-left', mount: mountHistoryTab, refresh: refreshHistoryTab },
-    { id: 'settings', label: 'Settings', icon: 'fa-sliders',        mount: mountSettingsTab, refresh: refreshSettingsTab },
+    { id: 'rotation', label: 'Rotation', icon: 'fa-circle-dot',  mount: mountRotationTab, refresh: refreshRotationTab },
+    { id: 'queues',   label: 'Queues',   icon: 'fa-layer-group', mount: mountQueuesTab,   refresh: refreshQueuesTab },
+    { id: 'settings', label: 'Settings', icon: 'fa-sliders',     mount: mountSettingsTab, refresh: refreshSettingsTab },
 ];
 
 let popup = null;
 let rootEl = null;
-let activeTab = 'chamber';
+let activeTab = 'rotation';
 const tabPanels = new Map();
 let unsubscribeStateChange = null;
 
@@ -45,7 +47,8 @@ export async function openRouletteModal(tabId = null) {
     rootEl.innerHTML = template();
     buildTabRail();
     buildTabPanels();
-    if (tabId) activeTab = tabId;
+    if (tabId && TABS.some(t => t.id === tabId)) activeTab = tabId;
+    if (!TABS.some(t => t.id === activeTab)) activeTab = 'rotation';
     selectTab(activeTab);
 
     // Our own close button — ST's popup chrome ✕ is unreliable on narrow

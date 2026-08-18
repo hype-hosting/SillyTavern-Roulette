@@ -2,7 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
-**Version:** 1.3.1
+**Version:** 2.0.0
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -12,11 +12,31 @@ A SillyTavern extension that rotates between connection profiles during roleplay
 
 ## Concept
 
-Users select multiple SillyTavern connection profiles, drop them into a "queue," set a rotation policy (sequential with fixed or ranged response counts, or weighted-random), and the extension automatically switches the active connection profile as the chat proceeds. State is per-chat. A small status indicator surfaces the current profile and how many responses remain in the current slot.
+Users select multiple SillyTavern connection profiles, drop them into a "queue," set a rotation policy (sequential with fixed or ranged response counts, or weighted-random), and the extension automatically switches the active connection profile as the chat proceeds. State is per-chat.
 
 Because the unit of rotation is the **connection profile**, the extension does not need to know anything about individual providers, API endpoints, model names, or sampler parameters — all of that lives in the profile itself. The extension is a *scheduler* that calls the existing profile-switch slash command at the right moments.
 
-The v1.0 UI is centred on a **modal with a glassy revolver-cylinder visualisation**: the active queue's slots become chambers in a brass-collared cylinder, and rotation advances are shown as the cylinder spinning to bring the next chamber into firing position. The drawer block in SillyTavern's Extensions panel is a trimmed quick-access surface (status + start/stop + Open Roulette button).
+The v2.0 UI has two surfaces:
+
+- **The pinned bar** (`src/ui/bar.js`) — a slim full-width row inside ST's chat
+  column, at a user-chosen position (above the message input by default; below
+  it, or above the chat log). It renders the rotation as a **linear dot strip**:
+  one colored dot per slot in queue order, the active slot grown into a lit
+  capsule carrying its responses-remaining count. Idle shows the same dots
+  hollow, plus a queue picker and ▶ for one-click starting. Skip / Stop
+  (⇄ Resume when paused) and the gear that opens the modal live on its right.
+- **The modal** (`src/ui/modal.js`) — three tabs: **Rotation** (panel-size dot
+  strip, status, actions, character auto-start binding, and the pick history),
+  **Queues** (card grid + inline editor), **Settings** (bar visibility +
+  position, animation speed, accent colour, palette).
+
+The drawer block in SillyTavern's Extensions panel is minimal: **Enable/Disable
+Roulette** (shows/hides the bar — a pure chrome toggle that never stops a
+running rotation) and **Settings** (opens the modal).
+
+The v1.x revolver-cylinder visualisation, floating draggable widget, and
+chat-input status pill were all removed in 2.0 — the dot strip and bar replace
+all three.
 
 ---
 
@@ -54,7 +74,7 @@ await executeSlashCommandsWithOptions(`/profile await=true ${profileName}`, { sh
 `/profile` does fuzzy matching by name via Fuse.js, so an exact-name validation pass against `extension_settings.connectionManager.profiles` is required *before* firing — otherwise a typo'd slot may silently switch to an unrelated profile.
 
 ### State storage
-- **Global settings** (rotation queues the user has defined, default rotation, UI preferences, per-character queue bindings) → `extension_settings.roulette` (persisted via `saveSettingsDebounced()`).
+- **Global settings** (rotation queues the user has defined, last-run queue, UI preferences, per-character queue bindings) → `extension_settings.roulette` (persisted via `saveSettingsDebounced()`).
 - **Per-chat rotation state** (which queue is active, current slot index, responses remaining in current slot, history of which profile generated which message) → `chat_metadata.roulette` (persisted via `saveMetadataDebounced()` from `../../../../scripts/extensions.js`).
 
 This split is deliberate: queue *definitions* are user-level assets reused across chats; *active rotation state* is chat-specific so different stories can run different rotations independently.
@@ -153,49 +173,71 @@ If a profile-switch fails (profile was deleted, slash command errors), skip that
 - **Weighted-random**: re-roll, excluding the failed slot for this round.
 - After 3 consecutive failures across different slots, halt rotation, set `activeQueueId = null`, surface a toast notification with the error.
 
-### 7. UI
+### 7. UI (v2.0)
 
-#### 7.1 Settings panel (Extensions drawer)
-A standard ST extension settings block titled "Roulette" with:
-- A list of saved queues (name, mode, slot count, edit/delete buttons).
-- A "New Queue" button.
-- A "Default queue for new chats" dropdown (optional convenience).
+#### 7.1 Extensions-drawer block
+A standard ST drawer block titled "Roulette" holding exactly two buttons:
+- **Enable Roulette / Disable Roulette** — toggles the pinned bar's visibility
+  (`ui.bar.enabled`). Chrome only: never stops a rotation, never blocks
+  character auto-start bindings.
+- **Settings** — opens the modal.
 
-#### 7.2 Queue editor modal
-Triggered by "New Queue" or editing an existing queue. Visual style: **clean modern dark, matching default SillyTavern aesthetics** — uses ST's existing CSS variables (`--SmartThemeBodyColor`, `--SmartThemeBlurTintColor`, `--SmartThemeBorderColor`, etc.), `Noto Sans` body, no custom fonts. Reuse ST's existing modal patterns (`.popup`, `.popup-content`) where possible so the modal feels native.
+This is the one surface styled with ST's CSS variables so it blends with the
+drawer; everything else owns the roulette canvas.
 
-Layout:
-- **Header**: Queue name input + mode toggle (Sequential / Weighted-Random).
-- **Slot list**: drag-to-reorder list of slots. Each row shows:
-  - Profile dropdown (populated from existing ST connection profiles — fetch via the same source ST's profile selector uses).
-  - Mode-dependent fields:
-    - *Sequential*: `Count` toggle (Fixed / Range) + number inputs.
-    - *Weighted-random*: `Weight` number input (default 1).
-  - Remove button.
-- **Add slot** button.
-- **Mode-specific footer**:
-  - *Sequential*: nothing extra.
-  - *Weighted-random*: "Run length" config (fixed or range), "No repeat in a row" toggle.
-- **Save / Cancel** buttons.
+#### 7.2 Pinned bar (`src/ui/bar.js`)
+The primary in-chat surface. Mounted as a sibling of `#chat` / `#send_form`
+inside ST's chat column at `ui.bar.position`:
 
-Validation: cannot save with zero slots, cannot save with profile names that don't resolve to existing profiles (warn but allow — the user might create the profile later).
+| position | insertion |
+|---|---|
+| `above-input` (default) | `before` `#send_form` |
+| `below-input` | `after` `#send_form` |
+| `above-chat` | `before` `#chat` |
 
-#### 7.3 Status indicator
-A small persistent UI element (in the chat header area, near the existing model selector) showing:
-- When rotation is **off**: nothing, or a small dimmed icon that opens the queue picker.
-- When rotation is **on**: `🎲 [Queue name] · [Profile name] · N left` (where N is `responsesRemaining`).
-- When **manually overridden**: `🎲 Paused · [Resume]`.
+States:
+- **Idle** — hollow dots previewing `preferredQueue()` (the last-run queue,
+  falling back to the first defined), a queue `<select>`, and ▶. Starting with
+  no queues routes to the modal's Queues tab instead.
+- **Running** — lit dots with the active slot's counter, profile name (with
+  color dot), Skip, Stop, gear.
+- **Paused (manual override)** — strip dims/desaturates, label reads "paused",
+  Stop swaps to Resume in place.
 
-Click target opens a small popover with: current queue, current slot, "Stop rotation," "Switch queue," "Resume / Pause."
+The bar self-heals: it subscribes to `onRotationStateChanged` before first
+attach, and `render()` re-attaches if ST rebuilt the chrome underneath it.
 
-#### 7.4 Queue activation
-A button or dropdown (in the status indicator popover, and also in the settings panel) to start a queue on the current chat. On activation:
-- Set `activeQueueId`.
-- Pick the starting slot:
-  - *Sequential*: first slot.
-  - *Weighted-random*: roll by weight.
-- Fire the profile switch immediately so the next generation uses the right profile.
-- Roll initial `responsesRemaining`.
+#### 7.3 Dot strip (`src/ui/dotStrip.js`)
+The whole visualisation. Plain DOM spans, no SVG. Three size variants —
+`bar`, `panel` (Rotation tab hero), `card` (queue-card thumbnails, static).
+Weighted-random mode scales dot diameter by √(weight/mean), clamped. Long
+queues window around the active slot with a "+N" chip. `mountDotStrip()`
+fingerprints the strip's shape and patches in place when only the active
+slot / counter / paused state changed, so CSS grow/shrink transitions are
+never restarted mid-flight. The active dot's numeral is near-black on the
+vivid dot color.
+
+#### 7.4 Modal (`src/ui/modal.js`)
+ST `Popup` (POPUP_TYPE.DISPLAY), three tabs, ARIA tablist + arrow keys:
+- **Rotation** (`tabs/rotation.js`) — panel dot strip, profile + queue meta,
+  Start/Skip/Stop/Resume, `Auto-start for <character>` select, and the pick
+  history (trail strip of the last 16 + newest-first rows, capped at 100).
+  Absorbed the old Chamber and History tabs.
+- **Queues** (`tabs/queues.js`) — card grid (dot-strip previews) + inline
+  editor; import/export; per-card start/stop/edit/bind/duplicate/export/delete.
+- **Settings** (`tabs/settings.js`) — bar visibility toggle + position
+  segmented control, animation-speed slider, accent-colour presets/picker,
+  read-only profile palette.
+
+Queue mutations made inside the modal call `notifyStateChanged()` (exported
+from `events.js`) so the bar's picker refreshes even though queue definitions
+live outside the per-chat rotation state.
+
+#### 7.5 Queue activation
+From the bar (idle ▶), the Rotation tab, a queue card's play button, or
+`/roulette-start`. On activation: set `activeQueueId`, pick the starting slot
+(sequential = first; weighted = roll), fire the profile switch immediately,
+roll initial `responsesRemaining`, and record `lastQueueId`.
 
 ### 8. Slash commands
 
@@ -260,35 +302,38 @@ the removed queue (done inline in `state.js` — routing it through
 `state.js`).
 
 **UI.** Two surfaces, one map: a contextual `Auto-start for <character>` select
-in the Chamber tab, and a characters-icon multi-select on each queue card in
+in the Rotation tab, and a characters-icon multi-select on each queue card in
 the Queues tab (`src/ui/bindingPicker.js`). A character has at most one
 queue, so the picker calls out characters already bound elsewhere rather than
 silently rebinding them.
 
 ---
 
-## Shipped in v1.0 (originally out-of-scope or stretch)
+## UI history
 
-These were called out as v2 / stretch in the original spec but landed in v1.0:
+**v2.0** replaced the entire visual layer. Removed: the revolver-cylinder SVG
+(`cylinder.js`), the floating draggable widget (`widget.js`), the chat-input
+status pill (`statusIndicator.js`), and the standalone History tab. Added: the
+linear dot strip (`dotStrip.js`), the pinned bar (`bar.js`), the merged
+Rotation tab, and the cool near-black palette. The drawer block collapsed to
+Enable/Disable + Settings. Anything in older commits referencing chambers,
+spins, pivots, or counter-rotation is describing the deleted v1.x UI.
 
-- **In-chat history visualisation** — `tabs/history.js` renders the trail strip + newest-first row list from `chat_metadata.roulette.history`.
-- **"Test rotation" simulate-20-picks button** — in the queue editor, runs `pickInitialSlot` + `advanceSlot` against the in-modal queue without saving, displays roll-by-roll output (each `advanceSlot` is its own run, so adjacent same-profile rolls don't visually merge).
-- **Queue export / import as JSON** — `src/exportImport.js`. Per-queue download icons + Export-all + Import. Envelope is `{ kind, schema, exportedAt, queue|queues }`; import accepts envelope, bare queue, or bare-array forms.
-- **Drag-to-reorder slots** — HTML5 drag-and-drop in the queue editor with grip handle, dashed-outline drop target, reduced-opacity source.
-- **Glassy revolver-cylinder UI + tabbed modal** — the v1.0 visual redesign. See `src/ui/modal.js`, `src/ui/cylinder.js`, and `src/ui/tabs/*` for structure.
-- **User UI prefs (animation speed, accent colour)** — persisted in `extension_settings.roulette.ui`; `applyUiSettings()` injects a `<style id="roulette-ui-overrides">` block to override `--roulette-*` tokens at runtime.
-- **Light + dark theme rendering** — modal owns its own dark canvas via `--roulette-*` tokens, independent of ST theme. Drawer + pill use ST CSS variables to blend with chat chrome.
+Still shipping from v1.0-1.3: drag-to-reorder slots, simulate-20-picks, queue
+export/import (`src/exportImport.js`), user UI prefs (animation speed, accent
+colour), per-slot sampler tuning (`src/sampling.js`), per-character bindings
+(`src/characterBinding.js`).
 
-## Still out of scope (genuine v2)
+## Out of scope (genuine future work)
 
-- **Per-slot parameter overrides** beyond what the connection profile carries. v1.0 leans entirely on profiles; for "DeepSeek cold" vs "DeepSeek warm", make two profiles.
+- **Per-slot parameter overrides** beyond what the connection profile carries
+  (beyond the v1.2 sampler tuning). For "DeepSeek cold" vs "DeepSeek warm",
+  make two profiles.
 - **Blind mode** (hide which profile generated which message until reveal).
-- **Cross-chat statistics** (how often each profile was used over all time, summary dashboards).
-- **Drag-load metaphor (variant L)** — the queue's chambers being directly loaded by dragging profile chips onto the cylinder, with the queue abstraction implicit. v1.0 ships variant P (read-only Chamber tab; editing in Queues tab).
+- **Cross-chat statistics** (how often each profile was used over all time,
+  summary dashboards).
 
----
-
-## Repository structure (v1.3)
+## Repository structure (v2.0)
 
 ```
 SillyTavern-Roulette/
@@ -300,29 +345,27 @@ SillyTavern-Roulette/
 ├── TESTING.md                 # manual acceptance-criteria walkthrough
 ├── LICENSE                    # AGPL-3.0
 ├── src/
-│   ├── state.js               # extension_settings + chat_metadata helpers; UI prefs
+│   ├── state.js               # extension_settings + chat_metadata helpers; UI prefs; v1→v2 migration
 │   ├── rotation.js            # PURE core logic (no ST imports) — scheduling + auto-activation rules
 │   ├── profileSwitcher.js     # /profile slash-command wrapper + isInternalSwitch flag
-│   ├── events.js              # ST event listeners + scheduler (start/stop/skip/spin/auto-start)
+│   ├── events.js              # ST event listeners + scheduler (start/stop/skip/auto-start)
 │   ├── characterBinding.js    # per-character queue bindings; ALL character-identity handling
 │   ├── sampling.js            # v1.2 per-slot sampler tuning via ST's preset system
 │   ├── slashCommands.js       # /roulette-* command definitions
 │   ├── exportImport.js        # queue JSON file download/upload helpers
 │   └── ui/
-│       ├── modal.js           # tabbed modal chassis (Chamber/Queues/History/Settings)
-│       ├── cylinder.js        # SVG glassy revolver-cylinder + spin animation
-│       ├── widget.js          # v1.1 floating draggable mini-cylinder panel
+│       ├── bar.js             # pinned status bar (primary in-chat surface)
+│       ├── dotStrip.js        # linear dot-strip visualisation (bar/panel/card variants)
+│       ├── modal.js           # tabbed modal chassis (Rotation/Queues/Settings)
 │       ├── bindingPicker.js   # character multi-select popup, opened from a queue card
 │       ├── profileColors.js   # hash-based stable profile colour assignment
 │       ├── queueEditor.js     # form builder shared by popup + embedded paths
-│       ├── settingsPanel.js   # drawer block: status + quick actions + Open Roulette
-│       ├── statusIndicator.js # chat-input pill (icon by default, hover for details)
+│       ├── settingsPanel.js   # drawer block: Enable/Disable Roulette + Settings
 │       ├── templates.html     # reserved for future fragments (currently empty)
 │       └── tabs/
-│           ├── chamber.js     # cylinder hero + status + actions + character-binding row
+│           ├── rotation.js    # dot-strip hero + status + actions + binding + pick history
 │           ├── queues.js      # card grid + inline editor (replaces right pane)
-│           ├── history.js     # trail strip + per-pick rows
-│           └── settings.js    # animation-speed slider + accent-colour picker
+│           └── settings.js    # bar position/visibility + animation + accent colour
 ├── tests/
 │   └── rotation.test.mjs      # node --test over the pure core (no ST, no DOM, no mocks)
 └── .gitignore
@@ -356,7 +399,7 @@ dependencies — `node --test` is built into Node.
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "1.3.1",
+  "version": "2.0.0",
   "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
@@ -370,7 +413,7 @@ dependencies — `node --test` is built into Node.
 - `registerEventListeners` — `registered` flag in `src/events.js`
 - `registerSlashCommands` — `registered` flag in `src/slashCommands.js`
 - `mountSettingsPanel` — `mounted` flag in `src/ui/settingsPanel.js`
-- `mountStatusIndicator` — `pillEl` null-check in `src/ui/statusIndicator.js`
+- `mountBar` — `barEl?.isConnected` check in `src/ui/bar.js`
 - `init()` itself — `initialized` flag in `index.js`, reset to `false` on error to allow retry
 
 Net effect: the hook is the canonical path when it works; the self-invoke is a no-cost safety net when it doesn't.
@@ -445,23 +488,29 @@ grep -rhoE 'fa-[a-z0-9-]+' --include=*.js --include=*.css . | sort -u
 then check each against that stylesheet.
 
 ### Style scoping
-All CSS rules under a single root class (e.g. `.roulette-extension`) to avoid bleeding into ST's UI. The drawer + pill use ST CSS variables (`--SmartThemeBodyColor` etc.) so they blend with chat chrome. The modal owns its own `--roulette-*` token set scoped to `.roulette-extension`, so its identity is stable regardless of ST theme. The user can override `--roulette-accent`, `--roulette-glow`, and `--roulette-glow-strong` via the Settings tab; `applyUiSettings()` (in `state.js`) writes them into a single `<style id="roulette-ui-overrides">` block in `<head>`.
+All CSS rules under a single root class (`.roulette-extension`) to avoid bleeding into ST's UI. The drawer block uses ST CSS variables (`--SmartThemeBodyColor` etc.) so it blends with the Extensions panel. The modal and bar own the `--roulette-*` token set — a cool near-black canvas (bg `#0c0d11`, surface `#15171d`, border `#242830`, accent `#8fa4c4`, text `#e8eaf0`) that is stable regardless of ST theme. Profile dots draw from the vivid 8-swatch palette in `profileColors.js`, tuned for mutual separation at 8-10px against that canvas. The user can override the accent via the Settings tab; `applyUiSettings()` (in `state.js`) writes `--roulette-accent`, the RGB tuple, glow variants, and a soft mix into a single `<style id="roulette-ui-overrides">` block in `<head>`. Responsive media queries sit at the END of style.css on purpose — source order beats earlier equal-specificity rules.
 
-### Modal architecture (v1.0)
-`src/ui/modal.js` owns the tabbed modal. Mounted via ST's `Popup` class with `POPUP_TYPE.DISPLAY`. Tab rail uses ARIA `tablist` semantics + arrow-key navigation. Tab modules under `src/ui/tabs/` each export `mount(container)` and `refresh(container)`. The modal subscribes to `onRotationStateChanged` from `events.js` and calls `refresh` on the active tab.
+### Modal + bar architecture (v2.0)
+`src/ui/modal.js` owns the tabbed modal. Mounted via ST's `Popup` class with
+`POPUP_TYPE.DISPLAY`. Tab rail uses ARIA `tablist` semantics + arrow-key
+navigation. Tab modules under `src/ui/tabs/` each export `mount(container)`
+and `refresh(container)`. The modal subscribes to `onRotationStateChanged`
+from `events.js` and calls `refresh` on the active tab.
 
-The cylinder (`src/ui/cylinder.js`) is the centrepiece. Two key implementation notes:
+`src/ui/bar.js` owns the pinned bar and follows the same subscribe-and-render
+pattern. Both surfaces render the rotation through `mountDotStrip()`
+(`src/ui/dotStrip.js`), which patches the existing DOM in place when only the
+active slot / counter / paused flag changed — rebuilding would restart the
+CSS grow/shrink transitions mid-flight. The strip's structural identity is a
+fingerprint of (variant, mode, slot ids + profiles + weights); any structural
+change rebuilds.
 
-- **Pivot rotation** uses `transform-box: view-box` + `transform-origin: 50% 50%` so the rotation centre is the SVG viewBox centre, geometry-independent. Earlier iterations used `fill-box` and produced post-spin vertical drift because the active chamber's halo extended past the collar on whichever side the chamber currently sat — making the bbox asymmetric and the bbox-relative pivot drift by 1-2 pixels per spin.
-- **Counter-rotation groups** (`.roulette-counter-rotate`) wrap chamber labels and any "lighting" decoration that should stay world-upright as the cylinder rotates. `spinCylinderTo` updates the pivot's CSS transform AND every counter-rotate group's SVG transform attribute in lock-step; matching CSS transitions on both keep them synchronised through the spin.
+Timing rule for CSS: durations are written `calc(<base> / var(--roulette-anim-scale))`
+— the user slider stores 0.25 (slow) to 2 (fast), so higher divides to faster.
 
-Sequential mode rotates by `360/N` per advance (snappy 420ms ease-out); weighted-random rotates by an integer number of full revolutions plus the target offset (1600ms long ease-out). The integer revolution count is critical — non-integer extras leave the cylinder offset from the target chamber by a fraction of a turn.
+## Acceptance criteria
 
----
-
-## Acceptance criteria for v1
-
-The extension is "done" for v1 when all of the following are true on a fresh ST install:
+The extension is "done" when all of the following are true on a fresh ST install (see TESTING.md for the current v2.0 walkthrough, including bar visibility/position and the v1→v2 settings migration):
 
 1. Installing via Extensions → Install from URL works without errors.
 2. The Roulette panel appears in the Extensions drawer.
@@ -474,10 +523,10 @@ The extension is "done" for v1 when all of the following are true on a fresh ST 
 9. Switching chats preserves each chat's independent rotation state.
 10. Manually switching profiles mid-rotation pauses the rotation and surfaces the "Resume" affordance.
 11. Deleting a profile that's in an active queue triggers the error path: that slot is skipped, rotation continues with the remaining profiles.
-12. The status indicator updates within one frame of any state change.
+12. The pinned bar updates within one frame of any state change.
 13. All four slash commands (`/roulette-start`, `/roulette-stop`, `/roulette-status`, `/roulette-skip`) work and produce sensible output.
 14. No console errors during normal use.
-15. The modal renders cleanly in both ST's light and dark themes.
+15. The modal and bar render identically under any ST theme (they own their canvas); the drawer block follows the ST theme.
 
 ---
 
@@ -500,20 +549,26 @@ Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR
 
 ---
 
-## v1.1 – v1.3 — done
+## Version log
 
-- **v1.1** — floating draggable widget (`src/ui/widget.js`) mirroring the cylinder during chat; glassmorphism + spring-easing pass; RGB-tuple token system.
-- **v1.2** — per-slot inline sampler tuning (`src/sampling.js`) overlaid through ST's preset machinery, with managed presets cleaned up on slot/queue removal.
-- **v1.3** — per-character queue bindings (`src/characterBinding.js`, `src/ui/bindingPicker.js`) plus the first automated test coverage of the pure core.
-
-## v1.0 milestone — done
-
-The original v1 acceptance criteria all pass (see `TESTING.md` for the manual walkthrough). The modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, and user UI prefs all shipped on top.
+- **v2.0** — full UI redesign: linear dot strip + pinned bar replace the
+  cylinder, widget, and pill; modal merged to three tabs; cool near-black
+  palette; density pass; drawer collapsed to two buttons; settings migration
+  (`ui.widget`→`ui.bar`, `defaultQueueId`→`lastQueueId`).
+- **v1.3** — per-character queue bindings plus the first automated test
+  coverage of the pure core.
+- **v1.2** — per-slot inline sampler tuning (`src/sampling.js`) overlaid
+  through ST's preset machinery, with managed presets cleaned up on
+  slot/queue removal.
+- **v1.1** — floating draggable widget (removed in 2.0); RGB-tuple token
+  system (kept).
+- **v1.0** — initial release: scheduler core, modal, queue editor,
+  drag-to-reorder, simulate-20-picks, export/import, history, UI prefs.
 
 ## Future work
 
 - **Blind mode** — hide which profile generated which message until the user reveals.
-- **Drag-load chamber metaphor** — drop profile chips directly onto chambers; the queue becomes implicit. Bigger UX change; wait until users ask for it.
 - **Cross-chat statistics** — total runs per profile, distribution dashboards.
-- **Keyboard shortcut to open the modal** (currently only the pill click + drawer button).
-- **Per-slot parameter overrides** — would mean reaching past the connection profile to override sampler settings. Architecturally clean to defer.
+- **Keyboard shortcut to open the modal** (currently the bar's gear + drawer button).
+- **Per-slot parameter overrides** — beyond the v1.2 sampler tuning; would mean
+  reaching further past the connection profile. Architecturally clean to defer.

@@ -9,10 +9,10 @@
  */
 
 import { getSettings, deleteQueue, getChatState, upsertQueue } from '../../state.js';
-import { startRotation, stopRotation, reevaluateAutoActivation } from '../../events.js';
+import { startRotation, stopRotation, reevaluateAutoActivation, notifyStateChanged } from '../../events.js';
 import { bindingCountForQueue } from '../../characterBinding.js';
 import { openBindingPicker } from '../bindingPicker.js';
-import { renderCylinder } from '../cylinder.js';
+import { mountDotStrip } from '../dotStrip.js';
 import { exportQueue, exportAllQueues, importQueueFile } from '../../exportImport.js';
 import { renderEditorInto } from '../queueEditor.js';
 import { cleanupManagedPresetsForQueue } from '../../sampling.js';
@@ -63,7 +63,7 @@ function renderGridView(container) {
             <div class="roulette-queues-empty hidden" data-field="empty-state">
                 <i class="fa-solid fa-layer-group"></i>
                 <p>No queues yet.</p>
-                <p class="roulette-text-muted">Click <b>New queue</b> to load your first cylinder.</p>
+                <p class="roulette-text-muted">Click <b>New queue</b> to line up your first rotation.</p>
             </div>
         </div>
     `;
@@ -92,6 +92,7 @@ function renderGridView(container) {
                 }
             }
             renderGridView(container);
+            notifyStateChanged();
         } catch (err) {
             if (typeof toastr !== 'undefined') toastr.error(`Import failed: ${err.message}`);
             console.error('[Roulette] import failed:', err);
@@ -140,6 +141,7 @@ function renderEditView(container, queue) {
         onSave: () => {
             pane.classList.remove('roulette-queues-editing');
             renderGridView(container);
+            notifyStateChanged();
         },
         onCancel: () => {
             pane.classList.remove('roulette-queues-editing');
@@ -156,13 +158,11 @@ function buildQueueCard(queue, isActive, tabContainer) {
 
     const previewHost = document.createElement('div');
     previewHost.className = 'roulette-queue-card-preview';
-    const svg = renderCylinder({
+    mountDotStrip(previewHost, {
         slots: queue.slots ?? [],
-        activeSlotId: null,
         mode: queue.mode,
-        mini: true,
+        variant: 'card',
     });
-    previewHost.appendChild(svg);
     card.appendChild(previewHost);
 
     const meta = document.createElement('div');
@@ -246,6 +246,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
         }
         upsertQueue(dup);
         populateGrid(tabContainer);
+        notifyStateChanged();
     });
     actions.querySelector('[data-card-act="export"]').addEventListener('click', () => {
         exportQueue(queue);
@@ -258,6 +259,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
         try { await cleanupManagedPresetsForQueue(queue); } catch (_) { /* ignore */ }
         deleteQueue(queue.id);
         populateGrid(tabContainer);
+        notifyStateChanged();
     });
 
     return card;

@@ -11,7 +11,7 @@
  */
 
 import { eventSource, event_types } from '../../../../../script.js';
-import { getChatState, updateChatState, findQueue } from './state.js';
+import { getChatState, updateChatState, findQueue, setLastQueueId } from './state.js';
 import {
     isCountableGeneration,
     pickInitialSlot,
@@ -47,7 +47,15 @@ export function onRotationStateChanged(listener) {
     stateChangeListeners.add(listener);
     return () => stateChangeListeners.delete(listener);
 }
-function notifyStateChanged() {
+
+/**
+ * Ping every UI surface to re-read state and re-render.
+ *
+ * Exported because queue definitions live in extension_settings, not in the
+ * rotation state — so the modal's create / delete / import paths have no
+ * other way to tell the pinned bar that its queue picker is now stale.
+ */
+export function notifyStateChanged() {
     for (const fn of stateChangeListeners) {
         try { fn(); } catch (err) { console.error('[Roulette] state listener threw', err); }
     }
@@ -71,6 +79,10 @@ export async function startRotation(queueId) {
 
     consecutiveFailures = 0;
     failedSlotIndices.clear();
+    // The bar offers the last-run queue when idle, so record it before the
+    // switch — even a start that fails mid-recovery was still a deliberate
+    // choice of this queue.
+    setLastQueueId(queue.id);
 
     const pick = pickInitialSlot(queue);
     if (!pick) {

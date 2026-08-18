@@ -1,77 +1,109 @@
 /*
  * SillyTavern-Roulette — AGPL-3.0
- * All rules scoped under .roulette-extension. Colors / borders use ST CSS
- * variables so light/dark themes work without overrides. The roulette
- * modal carries its own --roulette-* token set so its identity is stable
- * regardless of which ST theme is active; users can override --roulette-accent
- * and --roulette-glow to retheme the cylinder.
+ *
+ * All rules scoped under .roulette-extension. The extension owns its own
+ * --roulette-* token set — a cool near-black canvas that stays stable
+ * regardless of which ST theme is active. The Extensions-drawer block is
+ * the one surface that instead uses ST's CSS variables, so it blends with
+ * the drawer around it.
+ *
+ * Animation durations divide by --roulette-anim-scale (higher = faster),
+ * which applyUiSettings() overrides from user prefs.
+ *
+ * NOTE: the responsive media queries live at the END of this file ON
+ * PURPOSE. CSS resolves equal-specificity rules by source order, so a
+ * media query earlier than the base rule it overrides would lose.
  */
 
 .roulette-extension {
     /* Hex tokens — what most rules reference directly. */
-    --roulette-bg:            #14110f;
-    --roulette-surface:       #1c1815;
-    --roulette-surface-2:     #221d18;
-    --roulette-surface-glass: rgba(255, 250, 240, 0.05);
-    --roulette-border:        #2d2722;
-    --roulette-border-strong: #3f3729;
-    --roulette-accent:        #c7a461;
-    --roulette-accent-soft:   #8a7142;
-    --roulette-glow:          rgba(199, 164, 97, 0.45);
-    --roulette-glow-strong:   rgba(199, 164, 97, 0.75);
-    --roulette-text:          #f4ede0;
-    --roulette-text-muted:    #9a8e7a;
-    --roulette-text-dim:      #6c6356;
-    --roulette-go:            #6fbf73;
-    --roulette-stop:          #d96666;
-    --roulette-info:          #6ba8c7;
+    --roulette-bg:            #0c0d11;
+    --roulette-surface:       #15171d;
+    --roulette-surface-2:     #1b1e26;
+    --roulette-surface-glass: rgba(232, 234, 240, 0.04);
+    --roulette-border:        #242830;
+    --roulette-border-strong: #313745;
+    --roulette-accent:        #8fa4c4;
+    --roulette-accent-soft:   #616e85;
+    --roulette-glow:          rgba(143, 164, 196, 0.45);
+    --roulette-glow-strong:   rgba(143, 164, 196, 0.75);
+    --roulette-text:          #e8eaf0;
+    --roulette-text-muted:    #9aa3b5;
+    --roulette-text-dim:      #5d6472;
+    --roulette-go:            #5ed3a0;
+    --roulette-stop:          #ff7a7a;
+    --roulette-info:          #6ea8fe;
 
     /* RGB-tuple tokens — used when we need rgba() opacity layers without
      * defining a separate hex+alpha token for every opacity level.
-     * applyUiSettings() in state.js keeps these in sync when the user
-     * picks a custom accent. */
-    --roulette-bg-rgb:        20, 17, 15;
-    --roulette-surface-rgb:   28, 24, 21;
-    --roulette-accent-rgb:    199, 164, 97;
-    --roulette-text-rgb:      244, 237, 224;
+     * applyUiSettings() in state.js keeps the accent tuple in sync when
+     * the user picks a custom accent. */
+    --roulette-bg-rgb:        12, 13, 17;
+    --roulette-surface-rgb:   21, 23, 29;
+    --roulette-accent-rgb:    143, 164, 196;
+    --roulette-text-rgb:      232, 234, 240;
 
-    /* Animation timing. anim-scale multiplies every keyframe / transition
-     * duration; spring is the springy ease-out used on buttons / cards. */
+    /* Animation timing. Durations are written as
+     * calc(<base> / var(--roulette-anim-scale)) so 2 = twice as fast,
+     * 0.5 = half speed. Spring is the springy ease-out on live elements. */
     --roulette-anim-scale:    1;
     --roulette-spring:        cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    font-size: 0.85rem;
 }
 
 .roulette-extension .hidden { display: none !important; }
 
-/* Canonical section-header pattern: brass left bar + uppercase letterspaced
- * label. Used everywhere — queue editor, history header, settings tab,
- * widget. Surface-specific overrides only when sizing/spacing needs to
- * differ. */
+.roulette-extension .roulette-text-muted { color: var(--roulette-text-muted); }
+.roulette-extension .roulette-text-dim   { color: var(--roulette-text-dim); }
+
+/* Canonical section-header pattern: accent left bar + uppercase
+ * letterspaced label. Used everywhere a section starts. */
 .roulette-extension .roulette-section-title {
     color: var(--roulette-accent);
     font-weight: 600;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    font-size: 0.78rem;
-    padding-left: 0.55rem;
-    border-left: 3px solid var(--roulette-accent);
-    line-height: 1.4;
+    font-size: 0.68rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--roulette-accent);
+    line-height: 1.35;
 }
 
-/* ---------- Settings panel ---------- */
+.roulette-extension .roulette-section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.roulette-extension .roulette-section-value {
+    font-size: 0.72rem;
+    color: var(--roulette-text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.roulette-extension .roulette-help {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--roulette-text-dim);
+    margin: 0;
+}
+
+.roulette-extension .roulette-empty {
+    padding: 0.8rem 0.2rem;
+    font-size: 0.8rem;
+    color: var(--roulette-text-dim);
+}
+
+/* ============================================================
+ * Extensions-drawer block — the one ST-themed surface
+ * ============================================================ */
 
 .roulette-settings-block {
     margin-bottom: 0.5rem;
-}
-
-.roulette-settings-block .roulette-status {
-    padding: 0.4rem 0.6rem;
-    margin: 0.5rem 0;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor);
-    color: var(--SmartThemeBodyColor);
-    font-size: 0.95em;
+    /* ST theme context, not the roulette canvas. */
+    font-size: inherit;
 }
 
 .roulette-settings-block .roulette-row-actions {
@@ -82,424 +114,566 @@
     margin: 0.4rem 0;
 }
 
-.roulette-settings-block .roulette-section-title {
-    font-weight: 600;
-    margin: 0.7rem 0 0.3rem;
-    color: var(--SmartThemeBodyColor);
-    opacity: 0.85;
-}
+/* ============================================================
+ * Dot strip — the visualisation
+ * ============================================================
+ *
+ * Sizing is variant-scoped via --dot-size / --dot-gap; each dot can carry
+ * a --dot-scale multiplier (weighted mode) and a --dot-color. The active
+ * dot grows into a capsule holding the responses-remaining numeral.
+ */
 
-.roulette-settings-block .roulette-queues {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.roulette-settings-block .roulette-queue-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 0.6rem;
-    align-items: center;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor);
-}
-
-.roulette-queue-name {
-    font-weight: 600;
-    color: var(--SmartThemeBodyColor);
-}
-
-.roulette-queue-meta {
-    font-size: 0.85em;
-    opacity: 0.75;
-}
-
-.roulette-queue-actions {
-    display: flex;
-    gap: 0.3rem;
-}
-
-.roulette-empty {
-    padding: 0.6rem;
-    opacity: 0.7;
-    font-style: italic;
-}
-
-.roulette-history-drawer {
-    margin-top: 0.6rem;
-    border-top: 1px solid var(--SmartThemeBorderColor);
-    padding-top: 0.4rem;
-}
-
-.roulette-history-drawer > summary {
-    cursor: pointer;
-    list-style: revert;
-}
-
-.roulette-history {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    margin-top: 0.3rem;
-    max-height: 240px;
-    overflow-y: auto;
-}
-
-.roulette-history-row {
-    display: grid;
-    grid-template-columns: 3.5em 1fr auto;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.2rem 0.4rem;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 3px;
-    background: var(--SmartThemeBlurTintColor);
-    font-size: 0.85em;
-}
-
-.roulette-history-id {
-    opacity: 0.7;
-    font-family: monospace;
-}
-
-.roulette-history-profile {
-    color: var(--SmartThemeBodyColor);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.roulette-history-time {
-    opacity: 0.65;
-    font-size: 0.9em;
-}
-
-/* ---------- Queue editor modal ---------- */
-
-.roulette-queue-editor .roulette-modal-title {
-    margin: 0 0 0.6rem;
-    color: var(--SmartThemeBodyColor);
-}
-
-.roulette-queue-editor .roulette-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    min-width: 460px;
-}
-
-.roulette-queue-editor .roulette-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.roulette-queue-editor .roulette-field-inline {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.roulette-queue-editor .roulette-section-title {
-    font-weight: 600;
-    margin: 0.5rem 0 0.2rem;
-    color: var(--SmartThemeBodyColor);
-    opacity: 0.85;
-}
-
-.roulette-queue-editor .roulette-slots {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.roulette-slot-row {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor);
-    flex-wrap: wrap;
-    cursor: grab;
-}
-
-.roulette-slot-row.roulette-dragging {
-    opacity: 0.4;
-    cursor: grabbing;
-}
-
-.roulette-slot-row.roulette-drag-over {
-    outline: 2px dashed var(--SmartThemeBodyColor);
-    outline-offset: -2px;
-}
-
-.roulette-slot-grip {
-    opacity: 0.55;
-    cursor: grab;
-    padding: 0 0.15rem;
-}
-
-.roulette-slot-grip:hover {
-    opacity: 0.9;
-}
-
-.roulette-simulate-output {
-    margin: 0.4rem 0;
-    padding: 0.5rem 0.7rem;
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 4px;
-    background: var(--SmartThemeBlurTintColor);
-    color: var(--SmartThemeBodyColor);
-    font-size: 0.9em;
-    line-height: 1.4;
-}
-
-.roulette-simulate-error ul {
-    margin: 0.3rem 0 0 1.2rem;
-    padding: 0;
-}
-
-.roulette-slot-num {
-    font-weight: 600;
-    opacity: 0.7;
-    min-width: 1.4em;
-}
-
-.roulette-slot-profile {
-    flex: 1 1 200px;
-    min-width: 160px;
-}
-
-.roulette-slot-narrow {
-    width: 5.5em;
-    flex: 0 0 auto;
-}
-
-.roulette-range-fields {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.roulette-slot-actions {
-    display: flex;
-    gap: 0.25rem;
-    margin-left: auto;
-}
-
-.roulette-slot-tune-active {
-    color: var(--roulette-accent) !important;
-    text-shadow: 0 0 8px var(--roulette-glow);
-}
-
-/* Inline sampler-tuning panel — sits as a wrapped flex child below the
- * slot row's primary controls. Width: 100% makes it take a full visual
- * row inside the wrap. */
-.roulette-slot-tuning {
-    flex-basis: 100%;
-    width: 100%;
-    margin-top: 0.4rem;
-    padding: 0.6rem 0.7rem;
-    background: rgba(var(--roulette-bg-rgb), 0.55);
-    border: 1px solid var(--roulette-border);
-    border-radius: 6px;
-    box-shadow: inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.05);
-}
-
-.roulette-tuning-empty {
-    color: var(--roulette-text-dim);
-    font-style: italic;
-    font-size: 0.85rem;
-    text-align: center;
-    padding: 0.4rem;
-}
-
-.roulette-tuning-header {
+.roulette-dots {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--roulette-border);
+    --dot-size: 9px;
+    --dot-gap: 6px;
+    --dot-active-size: 17px;
+    --dot-font: 10px;
+    gap: var(--dot-gap);
+    min-height: var(--dot-active-size);
 }
 
-.roulette-tuning-api {
-    color: var(--roulette-text-muted);
-    font-size: 0.78rem;
-    margin-left: auto;
+.roulette-dots-panel {
+    --dot-size: 15px;
+    --dot-gap: 9px;
+    --dot-active-size: 27px;
+    --dot-font: 13px;
 }
 
-.roulette-tuning-api code {
-    color: var(--roulette-accent);
-    background: rgba(var(--roulette-accent-rgb), 0.08);
-    padding: 0.05rem 0.35rem;
-    border-radius: 3px;
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 0.92em;
+.roulette-dots-card {
+    --dot-size: 7px;
+    --dot-gap: 4px;
+    --dot-active-size: 7px;
 }
 
-.roulette-tuning-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
-.roulette-tuning-toggle input[type="checkbox"] {
-    cursor: pointer;
-}
-
-.roulette-tuning-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-.roulette-tuning-param {
-    display: grid;
-    grid-template-columns: 8em 1fr 5em auto;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.roulette-tuning-param-label {
-    color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-}
-
-.roulette-tuning-slider {
-    width: 100%;
-    margin: 0;
-}
-
-.roulette-tuning-number {
-    width: 5em;
-    padding: 0.2rem 0.4rem;
-    font-size: 0.85rem;
-}
-
-.roulette-tuning-clear {
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--roulette-text-dim);
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    cursor: pointer;
+.roulette-dot {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
-    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
-}
-
-.roulette-tuning-clear:hover {
-    color: var(--roulette-text);
-    background: rgba(var(--roulette-text-rgb), 0.06);
-    border-color: var(--roulette-border-strong);
-}
-
-.roulette-weighted-footer {
-    border-top: 1px solid var(--SmartThemeBorderColor);
-    padding-top: 0.5rem;
-    margin-top: 0.4rem;
-}
-
-.roulette-row-actions {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-/* ---------- Status pill / popover ---------- */
-
-.roulette-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
-    margin: 0 0.25rem;
-    border: 1px solid var(--SmartThemeBorderColor);
+    box-sizing: border-box;
+    width: calc(var(--dot-size) * var(--dot-scale, 1));
+    height: calc(var(--dot-size) * var(--dot-scale, 1));
+    min-width: calc(var(--dot-size) * var(--dot-scale, 1));
     border-radius: 999px;
-    background: var(--SmartThemeBlurTintColor);
-    color: var(--SmartThemeBodyColor);
-    cursor: pointer;
-    user-select: none;
-    font-size: 0.85em;
+    background: var(--dot-color, var(--roulette-text-dim));
+    flex: none;
+    transition:
+        width  calc(240ms / var(--roulette-anim-scale)) var(--roulette-spring),
+        height calc(240ms / var(--roulette-anim-scale)) var(--roulette-spring),
+        min-width calc(240ms / var(--roulette-anim-scale)) var(--roulette-spring),
+        background-color calc(180ms / var(--roulette-anim-scale)) ease,
+        box-shadow calc(180ms / var(--roulette-anim-scale)) ease,
+        opacity calc(180ms / var(--roulette-anim-scale)) ease;
+}
+
+/* Slot with no profile assigned yet. */
+.roulette-dot-empty {
+    background: transparent;
+    border: 1px dashed var(--roulette-text-dim);
+}
+
+/* The live slot: grows into a lit capsule and shows its counter. */
+.roulette-dot-active {
+    width: auto;
+    height: var(--dot-active-size);
+    min-width: var(--dot-active-size);
+    padding: 0 4px;
+    box-shadow:
+        0 0 8px var(--dot-color, var(--roulette-glow)),
+        0 0 1px var(--dot-color, var(--roulette-glow));
+}
+
+.roulette-dot-count {
+    font-size: var(--dot-font);
+    font-weight: 700;
     line-height: 1;
-    max-width: 22em;
-    overflow: hidden;
+    color: #0c0d11;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    /* Empty on inactive dots; padding collapses with it. */
 }
 
-.roulette-pill:hover,
-.roulette-pill:focus-visible {
-    outline: 1px solid var(--SmartThemeBodyColor);
+.roulette-dot-counted { padding: 0 5px; }
+
+/* One-shot flare when a dot becomes active — a switch should read as an
+ * event even at bar scale, where the size change alone is easy to miss. */
+.roulette-dot-igniting {
+    animation: roulette-dot-ignite calc(560ms / var(--roulette-anim-scale)) ease-out;
 }
 
-.roulette-pill-off {
+@keyframes roulette-dot-ignite {
+    0%   { box-shadow: 0 0 0   var(--dot-color, var(--roulette-glow)); }
+    35%  { box-shadow: 0 0 16px var(--dot-color, var(--roulette-glow-strong)); }
+    100% { box-shadow: 0 0 8px var(--dot-color, var(--roulette-glow)); }
+}
+
+/* Idle: rotation not running — dots render hollow, "unloaded". */
+.roulette-dots-idle .roulette-dot {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--dot-color, var(--roulette-text-dim));
+}
+
+.roulette-dots-idle .roulette-dot-empty {
+    box-shadow: none;
+}
+
+/* Paused by manual override: the whole strip goes cold. */
+.roulette-dots-paused {
+    filter: saturate(0.25);
     opacity: 0.55;
 }
 
-/* Compact by default — text collapses to width 0 so the pill is just an
- * icon. Hover or keyboard focus expands the label inline. Active rotation
- * has gap > 0 even when collapsed so the icon doesn't sit flush against
- * the (zero-width) text node. */
-.roulette-pill-text {
+/* "+N" chip when a long queue is windowed. */
+.roulette-dots-more {
+    font-size: 0.68rem;
+    color: var(--roulette-text-dim);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+}
+
+.roulette-dots-empty {
+    justify-content: flex-start;
+}
+
+.roulette-dots-placeholder {
+    font-size: 0.75rem;
+    color: var(--roulette-text-dim);
+    font-style: italic;
+}
+
+/* ============================================================
+ * Pinned bar
+ * ============================================================
+ *
+ * Mounted as a sibling of #chat / #send_form inside ST's chat column, at
+ * the position stored in ui.bar.position (data-bar-position attribute).
+ */
+
+.roulette-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 30px;
+    padding: 4px 10px;
+    margin: 3px 0;
+    background: rgba(var(--roulette-bg-rgb), 0.82);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    border: 1px solid var(--roulette-border);
+    border-radius: 8px;
+    color: var(--roulette-text);
+    box-shadow: inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.05);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .roulette-bar { background: var(--roulette-bg); }
+}
+
+.roulette-bar-dots { flex: none; }
+
+.roulette-bar-label {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 0.5rem;
+}
+
+.roulette-bar-profile {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 0;
-    opacity: 0;
-    margin-left: -0.35rem;
-    transition: max-width 220ms ease, opacity 160ms ease, margin-left 220ms ease;
 }
 
-.roulette-pill:hover .roulette-pill-text,
-.roulette-pill:focus-visible .roulette-pill-text {
-    max-width: 18em;
-    opacity: 1;
-    margin-left: 0;
+.roulette-bar-profile::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--dot-color, var(--roulette-text-dim));
+    flex: none;
 }
 
-.roulette-popover {
-    background: var(--SmartThemeBlurTintColor);
-    border: 1px solid var(--SmartThemeBorderColor);
-    border-radius: 6px;
-    padding: 0.6rem;
-    min-width: 220px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-    color: var(--SmartThemeBodyColor);
-    font-size: 0.9em;
-}
-
-.roulette-popover-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    margin-bottom: 0.5rem;
-}
-
-.roulette-popover-actions {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
-.roulette-warn {
-    color: var(--SmartThemeBodyColor);
-    opacity: 0.85;
+.roulette-bar-paused .roulette-bar-profile {
+    color: var(--roulette-text-muted);
     font-style: italic;
+    font-weight: 500;
+}
+
+.roulette-bar-queue {
+    appearance: none;
+    -webkit-appearance: none;
+    max-width: 230px;
+    min-width: 0;
+    padding: 2px 1.3rem 2px 0.5rem;
+    background: var(--roulette-surface)
+        url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%239aa3b5'/%3E%3C/svg%3E")
+        no-repeat right 0.45rem center;
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-overflow: ellipsis;
+}
+
+.roulette-bar-queue:disabled {
+    color: var(--roulette-text-dim);
+    cursor: default;
+}
+
+.roulette-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: none;
+}
+
+.roulette-bar-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--roulette-text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.roulette-bar-btn:hover {
+    background: var(--roulette-surface-2);
+    border-color: var(--roulette-border-strong);
+    color: var(--roulette-text);
+}
+
+.roulette-bar-btn:focus-visible {
+    outline: 2px solid var(--roulette-accent);
+    outline-offset: 1px;
+}
+
+.roulette-bar-btn-go:hover   { color: var(--roulette-go); }
+.roulette-bar-btn-stop:hover { color: var(--roulette-stop); }
+
+/* The gear sits slightly apart — it opens the modal, not the rotation. */
+.roulette-bar-btn-gear {
+    margin-left: 0.25rem;
+}
+
+/* Idle: the bar recedes — quieter border, no inner highlight. Running
+ * brings both back, so a start visibly "powers on" the whole row. */
+.roulette-bar-idle {
+    border-color: var(--roulette-border);
+    box-shadow: none;
+}
+
+.roulette-bar-running {
+    border-color: var(--roulette-border-strong);
+}
+
+/* ============================================================
+ * Shared controls — buttons, selects, ranges, swatches
+ * ============================================================ */
+
+.roulette-extension .roulette-action {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.roulette-extension .roulette-action i {
+    font-size: 0.72rem;
+    color: var(--roulette-text-muted);
+    transition: color 120ms ease;
+}
+
+.roulette-extension .roulette-action:hover {
+    border-color: var(--roulette-accent-soft);
+    color: var(--roulette-text);
+}
+
+.roulette-extension .roulette-action:hover i { color: var(--roulette-accent); }
+
+.roulette-extension .roulette-action:focus-visible {
+    outline: 2px solid var(--roulette-accent);
+    outline-offset: 1px;
+}
+
+.roulette-extension .roulette-action:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+
+.roulette-extension .roulette-action-primary {
+    background: rgba(var(--roulette-accent-rgb), 0.16);
+    border-color: var(--roulette-accent-soft);
+}
+
+.roulette-extension .roulette-action-primary i { color: var(--roulette-accent); }
+
+.roulette-extension .roulette-action-go:hover,
+.roulette-extension .roulette-action-go:hover i { color: var(--roulette-go); border-color: var(--roulette-go); }
+
+.roulette-extension .roulette-action-stop:hover,
+.roulette-extension .roulette-action-stop:hover i { color: var(--roulette-stop); border-color: var(--roulette-stop); }
+
+.roulette-extension .roulette-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0.28rem 1.4rem 0.28rem 0.55rem;
+    background: var(--roulette-surface-2)
+        url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%239aa3b5'/%3E%3C/svg%3E")
+        no-repeat right 0.5rem center;
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    max-width: 100%;
+    text-overflow: ellipsis;
+}
+
+.roulette-extension .roulette-select:disabled {
+    color: var(--roulette-text-dim);
+    cursor: default;
+}
+
+.roulette-extension .roulette-icon-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text-muted);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.roulette-extension .roulette-icon-btn:hover {
+    border-color: var(--roulette-accent-soft);
+    color: var(--roulette-text);
+}
+
+.roulette-extension .roulette-icon-btn-primary:hover { color: var(--roulette-go); border-color: var(--roulette-go); }
+.roulette-extension .roulette-icon-btn-stop:hover    { color: var(--roulette-stop); border-color: var(--roulette-stop); }
+
+.roulette-extension .roulette-range {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--roulette-border-strong);
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+}
+
+.roulette-extension .roulette-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--roulette-accent);
+    border: none;
+    box-shadow: 0 0 6px var(--roulette-glow);
+    cursor: grab;
+}
+
+.roulette-extension .roulette-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--roulette-accent);
+    border: none;
+    box-shadow: 0 0 6px var(--roulette-glow);
+    cursor: grab;
+}
+
+.roulette-extension .roulette-range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: var(--roulette-text-dim);
+}
+
+.roulette-extension .roulette-swatch {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 120ms var(--roulette-spring);
+}
+
+.roulette-extension .roulette-swatch:hover { transform: scale(1.12); }
+
+.roulette-extension .roulette-swatch-active {
+    outline: 2px solid var(--roulette-text);
+    outline-offset: 2px;
+}
+
+.roulette-extension .roulette-accent-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.roulette-extension .roulette-accent-custom {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.roulette-extension .roulette-accent-custom-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: var(--roulette-text-muted);
+}
+
+.roulette-extension .roulette-color-input {
+    width: 30px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.roulette-extension .roulette-palette-row {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.roulette-extension .roulette-palette-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+}
+
+.roulette-extension .roulette-segmented {
+    display: inline-flex;
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 6px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.roulette-extension .roulette-segment {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0.32rem 0.75rem;
+    background: transparent;
+    border: none;
+    color: var(--roulette-text-muted);
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.roulette-extension .roulette-segment + .roulette-segment {
+    border-left: 1px solid var(--roulette-border-strong);
+}
+
+.roulette-extension .roulette-segment:hover { color: var(--roulette-text); }
+
+.roulette-extension .roulette-segment-active {
+    background: rgba(var(--roulette-accent-rgb), 0.18);
+    color: var(--roulette-text);
+}
+
+.roulette-extension .roulette-segmented-disabled { opacity: 0.45; }
+
+.roulette-extension .roulette-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    color: var(--roulette-text-muted);
+    cursor: pointer;
+}
+
+.roulette-extension .roulette-toggle input { cursor: pointer; }
+
+/* Dark reskin for ST-classed controls (text_pole, menu_button) when they
+ * appear on the roulette canvas — the queue editor and pickers reuse them. */
+.roulette-modal .text_pole,
+.roulette-queue-editor .text_pole,
+.roulette-binding-picker .text_pole {
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text);
+    font-size: 0.8rem;
+    padding: 0.28rem 0.5rem;
+    height: auto;
+    min-height: 0;
+}
+
+.roulette-modal .menu_button,
+.roulette-queue-editor .menu_button,
+.roulette-binding-picker .menu_button {
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 5px;
+    color: var(--roulette-text);
+    font-size: 0.78rem;
+    padding: 0.3rem 0.7rem;
+}
+
+.roulette-modal .menu_button:hover,
+.roulette-queue-editor .menu_button:hover,
+.roulette-binding-picker .menu_button:hover {
+    border-color: var(--roulette-accent-soft);
+    background: var(--roulette-surface-2);
 }
 
 /* ============================================================
@@ -511,19 +685,9 @@
     background: var(--roulette-bg);
     border-radius: 8px;
     overflow: hidden;
-    /* Soft inner vignette to add depth on the dark canvas. */
-    box-shadow: inset 0 0 80px 0 rgba(0, 0, 0, 0.4);
     width: 100%;
     height: 100%;
 }
-
-/* Tablet and below — collapse the side rail into a horizontal strip,
- * shrink padding, and let the cylinder size to its container.
- *
- * NOTE: these media queries live near the END of this file ON PURPOSE.
- * CSS resolves equal-specificity rules by source order, so a media query
- * earlier than the base rule it overrides will lose. Keep them last.
- */
 
 .roulette-modal-shell {
     display: flex;
@@ -537,16 +701,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.85rem 1.2rem;
+    padding: 0.55rem 0.9rem;
     border-bottom: 1px solid var(--roulette-border);
-    background: linear-gradient(180deg, var(--roulette-surface-2) 0%, var(--roulette-bg) 100%);
+    background: var(--roulette-surface);
 }
 
 .roulette-modal-title {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    font-size: 1.05rem;
+    gap: 0.5rem;
+    font-size: 0.9rem;
     font-weight: 600;
     letter-spacing: 0.02em;
     color: var(--roulette-text);
@@ -554,7 +718,7 @@
 
 .roulette-modal-glyph {
     color: var(--roulette-accent);
-    filter: drop-shadow(0 0 6px var(--roulette-glow));
+    filter: drop-shadow(0 0 5px var(--roulette-glow));
 }
 
 .roulette-modal-close {
@@ -563,13 +727,13 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 5px;
     color: var(--roulette-text-muted);
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     padding: 0;
     transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
@@ -588,14 +752,13 @@
 
 .roulette-modal-body {
     display: grid;
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 168px 1fr;
     flex: 1;
     /* min-height: 0 + overflow: hidden is the classic "flex/grid child
      * with overflow inside" fix: without it, flex: 1 happily grows past
      * the shell's bounds when content is taller than the popup's
      * max-height, and the inner tab-content's overflow-y: auto never
-     * triggers because nobody actually clips. With it, body honours the
-     * shell's bounded height and the tab content scrolls internally. */
+     * triggers because nobody actually clips. */
     min-height: 0;
     overflow: hidden;
 }
@@ -605,7 +768,7 @@
 .roulette-tab-rail {
     display: flex;
     flex-direction: column;
-    padding: 0.6rem 0.4rem;
+    padding: 0.5rem 0.35rem;
     gap: 0.15rem;
     background: var(--roulette-surface);
     border-right: 1px solid var(--roulette-border);
@@ -614,19 +777,19 @@
 .roulette-tab {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.7rem;
+    gap: 0.55rem;
+    padding: 0.42rem 0.65rem;
     border: none;
     border-radius: 5px;
     background: transparent;
     color: var(--roulette-text-muted);
     font: inherit;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     text-align: left;
     cursor: pointer;
     transition: background-color 120ms ease, color 120ms ease;
-    border-left: 3px solid transparent;
-    margin-left: -3px;
+    border-left: 2px solid transparent;
+    margin-left: -2px;
 }
 
 .roulette-tab i {
@@ -634,6 +797,7 @@
     text-align: center;
     color: var(--roulette-accent-soft);
     transition: color 120ms ease;
+    font-size: 0.78rem;
 }
 
 .roulette-tab:hover {
@@ -655,7 +819,7 @@
 
 .roulette-tab-content {
     position: relative;
-    padding: 1.4rem 1.6rem;
+    padding: 0.9rem 1.1rem;
     overflow-y: auto;
     background: var(--roulette-bg);
     min-height: 0;
@@ -664,32 +828,15 @@
 .roulette-tab-panel {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
     min-height: 100%;
-}
-
-.roulette-tab-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    min-height: 300px;
-    color: var(--roulette-text-muted);
-    opacity: 0.6;
-    text-align: center;
-}
-
-.roulette-tab-placeholder i {
-    font-size: 2.5rem;
-    color: var(--roulette-accent-soft);
+    /* Cap content width so panes don't stretch into ribbons on wide
+     * screens; left-anchored, not centred, so tab switches don't shift
+     * the reading edge. */
+    max-width: 720px;
 }
 
 /* Override ST's popup chrome inside our modal so the canvas reads as ours.
- *
- * ST's `.large_dialogue_popup` and friends pin a fixed (and a bit small)
- * width on the popup; we want the modal to scale up to a comfortable size
- * on wide screens while still respecting the viewport on narrow ones.
  * The :has() selector keeps these overrides scoped to OUR popup only. */
 
 .popup:has(.roulette-modal) .popup-content {
@@ -700,29 +847,21 @@
 .popup:has(.roulette-modal),
 .popup.large_dialogue_popup:has(.roulette-modal),
 .popup.wide_dialogue_popup:has(.roulette-modal) {
-    /* Glass: translucent dark base + backdrop blur + an inset highlight
-     * that gives the panel a "lit from above" surface read. Browsers
-     * without backdrop-filter fall back to the solid bg gracefully. */
-    background: rgba(var(--roulette-bg-rgb), 0.85);
+    background: rgba(var(--roulette-bg-rgb), 0.88);
     backdrop-filter: blur(14px) saturate(120%);
     -webkit-backdrop-filter: blur(14px) saturate(120%);
     color: var(--roulette-text);
     border: 1px solid var(--roulette-border-strong);
     box-shadow:
-        inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.08),
+        inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.06),
         0 12px 48px -12px rgba(0, 0, 0, 0.65);
-    width: min(1080px, 95vw);
+    width: min(920px, 95vw);
     max-width: 95vw;
-    /* Size to content. Floor keeps small tabs (sparse History, fresh
-     * Settings) from collapsing into something tiny; cap stops dense
-     * tabs (long History, many queues) from blowing past the viewport. */
-    min-height: 480px;
-    max-height: min(760px, 88vh);
+    min-height: 440px;
+    max-height: min(680px, 88vh);
     padding: 0;
 }
 
-/* Fallback for browsers without backdrop-filter — bump the bg opacity
- * so the panel doesn't read as washed-out on whatever's behind it. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .popup:has(.roulette-modal),
     .popup.large_dialogue_popup:has(.roulette-modal),
@@ -742,245 +881,242 @@
     border: none;
 }
 
-/* Hide ST's default popup OK/Cancel button row — we use our own header
- * close button (the X provided by ST) and don't want the bottom row. */
+/* Hide ST's default popup OK/Cancel button row — the modal has its own
+ * header close button. */
 .popup:has(.roulette-modal) .popup-controls {
     display: none;
 }
 
 /* ============================================================
- * Chamber tab — layout
+ * Rotation tab
  * ============================================================ */
 
-.roulette-chamber-layout {
-    display: grid;
-    grid-template-rows: 1fr auto auto auto;
-    gap: 1.4rem;
-    height: 100%;
-    align-items: center;
-}
-
-.roulette-chamber-stage {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 360px;
-    /* radial vignette behind the cylinder so it floats off the canvas */
-    background:
-        radial-gradient(ellipse at center,
-            rgba(199, 164, 97, 0.06) 0%,
-            transparent 55%);
-}
-
-.roulette-stage-empty {
+.roulette-rot {
     display: flex;
     flex-direction: column;
+    gap: 0.85rem;
+}
+
+.roulette-rot-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.8rem 0.9rem;
+    background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 7px;
+}
+
+.roulette-rot-strip {
+    display: flex;
+    min-height: 27px;
     align-items: center;
+}
+
+.roulette-rot-status {
+    display: flex;
+    align-items: baseline;
     gap: 0.6rem;
-    color: var(--roulette-text-muted);
-    text-align: center;
-    padding: 2rem;
+    flex-wrap: wrap;
 }
 
-.roulette-stage-empty > i {
-    font-size: 3rem;
-    color: var(--roulette-accent-soft);
-    opacity: 0.65;
-}
-
-.roulette-stage-empty .roulette-text-muted {
-    color: var(--roulette-text-dim);
-    font-size: 0.9rem;
-}
-
-.roulette-chamber-meta {
-    display: flex;
-    flex-direction: column;
+.roulette-rot-profile {
+    display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-}
-
-.roulette-chamber-status {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    font-size: 1.05rem;
-}
-
-.roulette-status-active-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--roulette-accent);
-    box-shadow: 0 0 8px var(--roulette-glow-strong);
-    animation: roulette-pulse calc(2500ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-}
-
-.roulette-status-label {
-    color: var(--roulette-text);
+    gap: 0.45rem;
+    font-size: 1rem;
     font-weight: 600;
     letter-spacing: 0.01em;
 }
 
-.roulette-status-pill {
-    color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-    padding: 0.15rem 0.55rem;
-    border: 1px solid var(--roulette-border-strong);
+.roulette-rot-profile::before {
+    content: '';
+    width: 8px;
+    height: 8px;
     border-radius: 999px;
-    background: var(--roulette-surface-2);
+    background: var(--dot-color, transparent);
+    flex: none;
 }
 
-.roulette-status-paused {
-    color: var(--roulette-stop);
-    font-size: 0.85rem;
-    font-style: italic;
+.roulette-rot-profile-idle {
+    color: var(--roulette-text-muted);
+    font-weight: 500;
 }
 
-.roulette-status-idle {
+.roulette-rot-profile-idle::before { display: none; }
+
+.roulette-rot-meta {
+    font-size: 0.76rem;
     color: var(--roulette-text-dim);
-    font-style: italic;
 }
 
-.roulette-chamber-queue-info {
+.roulette-rot-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.roulette-rot-controls .roulette-select {
+    min-width: 180px;
+}
+
+.roulette-rot-bind {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+    padding: 0.45rem 0.65rem;
+    background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
+    cursor: default;
+}
+
+.roulette-rot-bind-label {
+    font-size: 0.78rem;
     color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.roulette-empty-hint {
-    text-align: center;
-    color: var(--roulette-text-muted);
-    font-size: 0.9rem;
-    margin: 0 auto;
-    max-width: 32rem;
+.roulette-rot-bind-label b { color: var(--roulette-text); }
+
+.roulette-rot-bind .roulette-select {
+    max-width: 55%;
 }
 
-/* ============================================================
- * Cylinder — visual
- * ============================================================ */
-
-.roulette-cylinder {
-    width: min(360px, 60vh);
-    height: min(360px, 60vh);
-    overflow: visible;
-    user-select: none;
+.roulette-rot-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 0;
 }
 
-.roulette-cylinder-mini {
-    width: 80px;
-    height: 80px;
-    overflow: visible;
+/* Trail: last N picks as small dots, oldest left → newest right. */
+.roulette-trail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 11px;
 }
 
-/* Pivot rotation — sequential mode uses snappy ease-out, weighted-random
- * uses a longer roulette-wheel-style deceleration. transform-box: view-box
- * pins the rotation centre to the SVG viewBox centre (geometry-only); using
- * fill-box would tie it to the rendered children's bbox, which shifts a
- * couple pixels when the active chamber's halo extends past the collar
- * on whichever side the chamber currently sits — that's what produced
- * the post-spin vertical drift the user reported.
- */
-.roulette-cylinder-pivot {
-    transform-box: view-box;
-    transform-origin: 50% 50%;
-    transition: transform calc(420ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
-    will-change: transform;
+.roulette-trail-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--roulette-text-dim);
+    flex: none;
 }
 
-.roulette-cylinder-pivot.roulette-cylinder-spinning-weighted {
-    transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
+.roulette-trail-dot-empty {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--roulette-border-strong);
 }
 
-/* Counter-rotation groups — chamber decorations (gloss + label) and hub
- * gloss. They animate via the SVG transform attribute (which CSS
- * transitions support in modern browsers) in lock-step with the pivot,
- * keeping labels and lighting world-upright while the cylinder spins. */
-.roulette-counter-rotate {
-    transition: transform calc(420ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.16, 0.84, 0.32, 1);
+.roulette-trail-dot-newest {
+    box-shadow: 0 0 6px currentColor;
 }
 
-.roulette-cylinder-pivot.roulette-cylinder-spinning-weighted .roulette-counter-rotate {
-    transition: transform calc(1600ms / var(--roulette-anim-scale, 1)) cubic-bezier(0.05, 0.7, 0.1, 1);
+/* Pick rows — 30px line height, tabular columns. */
+.roulette-rows {
+    display: flex;
+    flex-direction: column;
 }
 
-/* While spinning, suppress the active-chamber breathing so the spin reads
- * cleanly without competing animations. */
-.roulette-cylinder-pivot.roulette-cylinder-spinning .roulette-chamber-halo {
-    animation: none;
+.roulette-row {
+    display: grid;
+    grid-template-columns: 10px 52px 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    height: 30px;
+    padding: 0 0.45rem;
+    border-bottom: 1px solid var(--roulette-border);
+    font-size: 0.8rem;
 }
 
-/* ============================================================
- * Cylinder — pip ring + ignition flash
- * ============================================================ */
+.roulette-row:hover { background: var(--roulette-surface); }
 
-.roulette-pip {
-    transition: opacity 150ms ease;
+.roulette-row-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
 }
 
-.roulette-pip-tick {
-    animation: roulette-pip-tick calc(280ms / var(--roulette-anim-scale, 1)) ease-out;
+.roulette-row-id {
+    color: var(--roulette-text-dim);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.74rem;
 }
 
-@keyframes roulette-pip-tick {
-    0%   { opacity: 1;    fill: var(--roulette-accent); }
-    25%  { opacity: 1;    fill: rgba(255, 250, 240, 0.95); }
-    100% { opacity: 0.22; fill: var(--roulette-accent); }
+.roulette-row-name {
+    color: var(--roulette-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Ignition flash on the active chamber's halo, fired once after a spin
- * settles. The roulette-chamber-igniting class is added by chamber.js
- * and removed when the animation completes. */
-.roulette-chamber-igniting .roulette-chamber-halo {
-    animation: roulette-ignite calc(900ms / var(--roulette-anim-scale, 1)) ease-out forwards;
+.roulette-row-time {
+    color: var(--roulette-text-dim);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
 }
 
-@keyframes roulette-ignite {
-    0%   { opacity: 1.4; filter: blur(4px); }
-    20%  { opacity: 1.6; filter: blur(6px); }
-    60%  { opacity: 1;   filter: blur(8px); }
-    100% { opacity: 0.75; filter: blur(10px); }
+.roulette-rows-note {
+    padding: 0.4rem 0.45rem;
+    font-size: 0.72rem;
+    color: var(--roulette-text-dim);
 }
 
 /* ============================================================
- * Queues tab — toolbar + card grid
+ * Queues tab
  * ============================================================ */
+
+.roulette-queues-pane { min-height: 0; }
+
+/* While the inline editor replaces the grid, let it own the pane height. */
+.roulette-queues-editing {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
 
 .roulette-queues-layout {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.7rem;
 }
 
 .roulette-queues-toolbar {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.45rem;
+    align-items: center;
     flex-wrap: wrap;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid var(--roulette-border);
 }
 
 .roulette-queue-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 0.8rem;
+    grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+    gap: 0.6rem;
 }
 
 .roulette-queues-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    padding: 3rem 1rem;
+    gap: 0.4rem;
+    padding: 2rem 1rem;
     color: var(--roulette-text-muted);
     text-align: center;
 }
 
 .roulette-queues-empty i {
-    font-size: 2.5rem;
+    font-size: 1.6rem;
     color: var(--roulette-accent-soft);
-    opacity: 0.5;
 }
+
+.roulette-queues-empty p { margin: 0; }
 
 /* ---------- Queue card ---------- */
 
@@ -988,131 +1124,82 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 1rem 0.8rem 0.8rem;
-    background: rgba(var(--roulette-surface-rgb), 0.55);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 8px;
+    gap: 0.45rem;
+    padding: 0.6rem 0.7rem;
+    background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 7px;
     cursor: pointer;
-    transition:
-        transform 160ms var(--roulette-spring),
-        border-color 160ms ease,
-        box-shadow 220ms ease,
-        background-color 160ms ease;
-    overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.05);
+    transition: border-color 130ms ease, transform 130ms var(--roulette-spring);
 }
 
 .roulette-queue-card:hover {
-    border-color: var(--roulette-accent-soft);
-    transform: translateY(-2px);
-    background: rgba(var(--roulette-surface-rgb), 0.7);
-    box-shadow:
-        inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.07),
-        0 8px 24px -8px rgba(0, 0, 0, 0.6);
-}
-
-.roulette-queue-card:active {
-    transform: scale(0.98);
+    border-color: var(--roulette-border-strong);
+    transform: translateY(-1px);
 }
 
 .roulette-queue-card:focus-visible {
     outline: 2px solid var(--roulette-accent);
-    outline-offset: 1px;
+    outline-offset: 2px;
 }
 
 .roulette-queue-card-active {
-    border-color: var(--roulette-accent);
-    box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 22px -6px var(--roulette-glow);
-    animation: roulette-card-glow calc(2800ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-}
-
-@keyframes roulette-card-glow {
-    from { box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 14px -8px var(--roulette-glow); }
-    to   { box-shadow: 0 0 0 1px var(--roulette-accent), 0 0 28px -4px var(--roulette-glow-strong); }
+    border-color: var(--roulette-accent-soft);
+    box-shadow: 0 0 10px rgba(var(--roulette-accent-rgb), 0.12);
 }
 
 .roulette-queue-card-preview {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 90px;
+    min-height: 12px;
+    padding: 0.15rem 0;
 }
 
 .roulette-queue-card-meta {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 0.3rem;
-    width: 100%;
-    text-align: center;
+    min-width: 0;
 }
 
 .roulette-queue-card-name {
+    font-size: 0.86rem;
     font-weight: 600;
-    color: var(--roulette-text);
-    font-size: 0.95rem;
-    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
 }
 
 .roulette-queue-card-tags {
     display: flex;
     gap: 0.3rem;
     flex-wrap: wrap;
-    justify-content: center;
 }
 
 .roulette-tag {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.1rem 0.45rem;
-    border-radius: 999px;
-    background: var(--roulette-bg);
-    color: var(--roulette-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.42rem;
+    background: var(--roulette-surface-2);
     border: 1px solid var(--roulette-border);
+    border-radius: 999px;
+    font-size: 0.66rem;
+    color: var(--roulette-text-muted);
+    letter-spacing: 0.02em;
 }
 
-.roulette-tag-mode {
-    color: var(--roulette-accent-soft);
-}
+.roulette-tag-mode { color: var(--roulette-accent); border-color: var(--roulette-accent-soft); }
+.roulette-tag-active { color: var(--roulette-go); border-color: var(--roulette-go); }
+.roulette-tag-tuned { color: var(--roulette-info); }
+.roulette-tag-bound { color: var(--roulette-text); }
 
-.roulette-tag-active {
-    background: var(--roulette-accent);
-    color: var(--roulette-bg);
-    border-color: var(--roulette-accent);
-    font-weight: 600;
-}
-
-.roulette-tag-tuned {
-    color: var(--roulette-accent);
-    border-color: var(--roulette-accent-soft);
-    background: rgba(var(--roulette-accent-rgb), 0.1);
-}
-
-.roulette-tag-tuned i {
-    margin-right: 0.2em;
-}
-
-/* Action row revealed on hover. Slides up from the bottom edge. */
-
+/* Action row: revealed on hover/focus so idle cards stay quiet. */
 .roulette-queue-card-actions {
     display: flex;
-    gap: 0.3rem;
-    justify-content: center;
-    width: 100%;
-    margin-top: auto;
-    padding-top: 0.4rem;
-    opacity: 0.45;
-    transition: opacity 160ms ease;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 130ms ease;
 }
 
 .roulette-queue-card:hover .roulette-queue-card-actions,
@@ -1120,286 +1207,253 @@
     opacity: 1;
 }
 
-.roulette-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: transparent;
-    color: var(--roulette-text-muted);
-    border: 1px solid var(--roulette-border);
-    border-radius: 5px;
-    cursor: pointer;
-    transition:
-        transform 160ms var(--roulette-spring),
-        background-color 160ms ease,
-        color 160ms ease,
-        border-color 160ms ease,
-        box-shadow 160ms ease;
-    padding: 0;
-    font-size: 0.85rem;
-}
-
-.roulette-icon-btn:active {
-    transform: scale(0.92);
-}
-
-.roulette-icon-btn:hover {
-    color: var(--roulette-text);
-    border-color: var(--roulette-accent-soft);
-    background: var(--roulette-surface-2);
-}
-
-.roulette-icon-btn-primary {
-    color: var(--roulette-accent);
-    border-color: var(--roulette-accent-soft);
-}
-
-.roulette-icon-btn-primary:hover {
-    border-color: var(--roulette-accent);
-    box-shadow: 0 0 12px -4px var(--roulette-glow);
-}
-
-.roulette-icon-btn-stop:hover {
-    color: var(--roulette-stop);
-    border-color: var(--roulette-stop);
-    box-shadow: 0 0 10px -4px rgba(217, 102, 102, 0.5);
-}
-
 /* ============================================================
- * Embedded queue editor
+ * Queue editor (embedded in the Queues tab, and the popup path)
  * ============================================================ */
 
-.roulette-queues-editing {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.roulette-editor-host {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
+.roulette-editor-host { min-height: 0; }
 
 .roulette-editor-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.6rem;
-    padding-top: 0.4rem;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid var(--roulette-border);
-    margin-bottom: 0.4rem;
-    /* Stick to the top of the scrollable tab content so Back / Save
-     * stay reachable when editing a long queue. */
-    position: sticky;
-    top: -1.4rem;  /* offset cancels the tab-content's top padding */
-    background: var(--roulette-bg);
-    z-index: 2;
+    margin-bottom: 0.7rem;
 }
 
 .roulette-editor-title {
-    flex: 1;
-    text-align: center;
+    font-size: 0.86rem;
     font-weight: 600;
     color: var(--roulette-text);
-    letter-spacing: 0.02em;
 }
 
-/* Reskin the embedded editor's form to match the modal aesthetic. The
- * existing .roulette-queue-editor styles target the popup-form variant;
- * we add the modal-flavoured overrides under .roulette-editor-host. */
-
-.roulette-editor-host .roulette-form {
-    min-width: 0;
+.roulette-queue-editor .roulette-form,
+.roulette-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
 }
 
-.roulette-editor-host .roulette-section-title {
-    color: var(--roulette-accent);
-    font-weight: 600;
+.roulette-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.roulette-field > span {
+    font-size: 0.7rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    font-size: 0.78rem;
-    margin-top: 0.7rem;
-    padding-left: 0.5rem;
-    border-left: 3px solid var(--roulette-accent);
-}
-
-.roulette-editor-host .roulette-field > span,
-.roulette-editor-host .roulette-field-inline > span {
     color: var(--roulette-text-muted);
-    font-size: 0.85rem;
 }
 
-.roulette-editor-host .roulette-slot-row {
+.roulette-field-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+    color: var(--roulette-text);
+    flex-wrap: wrap;
+}
+
+.roulette-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.roulette-slot-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    padding: 0.35rem 0.5rem;
     background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
+    min-height: 30px;
+}
+
+.roulette-slot-grip {
+    color: var(--roulette-text-dim);
+    cursor: grab;
+    font-size: 0.72rem;
+}
+
+.roulette-slot-num {
+    font-size: 0.72rem;
+    color: var(--roulette-text-dim);
+    font-variant-numeric: tabular-nums;
+    min-width: 1.3em;
+}
+
+.roulette-slot-profile { flex: 1; min-width: 140px; }
+
+.roulette-slot-narrow { width: 62px; flex: none; }
+
+.roulette-range-fields {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--roulette-text-dim);
+}
+
+.roulette-slot-actions {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+.roulette-slot-actions .menu_button {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 0.7rem;
+}
+
+.roulette-slot-tune-active {
+    color: var(--roulette-accent) !important;
+    border-color: var(--roulette-accent-soft) !important;
+}
+
+/* Drag-to-reorder affordances */
+.roulette-dragging { opacity: 0.45; }
+
+.roulette-drag-over {
+    outline: 1px dashed var(--roulette-accent);
+    outline-offset: 2px;
+}
+
+/* Inline sampler-tuning panel — a wrapped flex child spanning the row. */
+.roulette-slot-tuning {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.35rem;
+    padding: 0.5rem 0.6rem;
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
+}
+
+.roulette-tuning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.roulette-tuning-api {
+    font-size: 0.72rem;
+    color: var(--roulette-text-dim);
+}
+
+.roulette-tuning-api code {
+    color: var(--roulette-text-muted);
+    background: none;
+    padding: 0;
+}
+
+.roulette-tuning-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--roulette-text-muted);
+    cursor: pointer;
+}
+
+.roulette-tuning-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.roulette-tuning-param {
+    display: grid;
+    grid-template-columns: 105px 1fr 66px 24px;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.roulette-tuning-param-label {
+    font-size: 0.72rem;
+    color: var(--roulette-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.roulette-tuning-slider { min-width: 0; }
+
+.roulette-tuning-number { width: 100%; }
+
+/* Param rows the user has actually moved get a brighter label, so a
+ * glance separates deliberate overrides from untouched defaults. */
+.roulette-tuning-touched .roulette-tuning-param-label {
+    color: var(--roulette-text);
+}
+
+.roulette-tuning-clear {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--roulette-text-dim);
+    font-size: 0.65rem;
+    cursor: pointer;
+}
+
+.roulette-tuning-clear:hover {
+    color: var(--roulette-text);
     border-color: var(--roulette-border-strong);
 }
 
-.roulette-editor-host .roulette-slot-row.roulette-dragging {
-    opacity: 0.45;
-}
-
-.roulette-editor-host .roulette-slot-row.roulette-drag-over {
-    outline: 2px dashed var(--roulette-accent);
-    outline-offset: -2px;
-}
-
-/* ============================================================
- * History tab
- * ============================================================ */
-
-.roulette-history-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-}
-
-.roulette-history-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--roulette-border);
-}
-
-.roulette-history-header .roulette-section-title {
-    color: var(--roulette-accent);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-size: 0.78rem;
-    padding-left: 0.5rem;
-    border-left: 3px solid var(--roulette-accent);
-}
-
-.roulette-history-count {
-    color: var(--roulette-text-muted);
-    font-size: 0.8rem;
-}
-
-.roulette-history-trail {
-    display: flex;
-    gap: 0.4rem;
-    padding: 0.6rem 0.8rem;
-    background: rgba(var(--roulette-surface-rgb), 0.45);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid var(--roulette-border);
-    border-radius: 6px;
-    align-items: center;
-    overflow-x: auto;
-    box-shadow: inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.04);
-}
-
-.roulette-trail-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--roulette-text-dim);
-    flex: 0 0 auto;
-    transition: transform 200ms ease;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-
-.roulette-trail-dot-empty {
-    opacity: 0.18;
-    background: var(--roulette-text-dim);
-    box-shadow: none;
-}
-
-.roulette-trail-dot-newest {
-    width: 18px;
-    height: 18px;
-    box-shadow: 0 0 14px -2px currentColor, 0 0 0 1px rgba(255, 255, 255, 0.15);
-    /* The currentColor trick lets the box-shadow inherit from each pip's
-     * own colour. Need to set color: ... matching backgroundColor. JS sets
-     * background-color via inline style but not color, so add a lift via
-     * filter instead: */
-    filter: drop-shadow(0 0 6px var(--roulette-glow-strong));
-    animation: roulette-trail-pulse calc(2400ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-}
-
-@keyframes roulette-trail-pulse {
-    from { transform: scale(1); }
-    to   { transform: scale(1.15); }
-}
-
-.roulette-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    max-height: 380px;
-    overflow-y: auto;
-    padding: 0.2rem 0;
-}
-
-.roulette-history-list .roulette-history-row {
-    display: grid;
-    grid-template-columns: 14px 4em 1fr auto;
-    gap: 0.6rem;
-    align-items: center;
-    padding: 0.35rem 0.6rem;
-    border: 1px solid var(--roulette-border);
-    border-radius: 4px;
-    background: var(--roulette-surface);
-    font-size: 0.88rem;
-    transition: border-color 140ms ease;
-}
-
-.roulette-history-list .roulette-history-row:hover {
-    border-color: var(--roulette-accent-soft);
-}
-
-.roulette-history-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-
-.roulette-history-list .roulette-history-id {
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    color: var(--roulette-text-muted);
-    font-size: 0.85em;
-}
-
-.roulette-history-list .roulette-history-profile {
-    color: var(--roulette-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.roulette-history-list .roulette-history-time {
+.roulette-tuning-empty {
+    font-size: 0.75rem;
     color: var(--roulette-text-dim);
-    font-size: 0.85em;
-}
-
-.roulette-history-truncation {
-    text-align: center;
-    color: var(--roulette-text-dim);
-    font-size: 0.8rem;
-    padding: 0.4rem;
     font-style: italic;
 }
 
-.roulette-history-empty {
+.roulette-weighted-footer {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 3rem 1rem;
-    color: var(--roulette-text-muted);
-    text-align: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.65rem;
+    background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
 }
 
-.roulette-history-empty i {
-    font-size: 2.5rem;
-    color: var(--roulette-accent-soft);
-    opacity: 0.5;
+.roulette-simulate-output {
+    padding: 0.5rem 0.65rem;
+    background: var(--roulette-surface);
+    border: 1px solid var(--roulette-border);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    line-height: 1.5;
 }
+
+.roulette-simulate-error { color: var(--roulette-stop); }
+
+.roulette-simulate-error ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.roulette-simulate-result b { color: var(--roulette-accent); }
 
 /* ============================================================
  * Settings tab
@@ -1408,948 +1462,139 @@
 .roulette-settings-layout {
     display: flex;
     flex-direction: column;
-    gap: 1.6rem;
-    max-width: 540px;
+    gap: 0.85rem;
+    max-width: 560px;
 }
 
 .roulette-section {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-}
-
-.roulette-section-title-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-}
-
-.roulette-tab-content .roulette-section-title {
-    color: var(--roulette-accent);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    font-size: 0.78rem;
-    padding-left: 0.5rem;
-    border-left: 3px solid var(--roulette-accent);
-}
-
-.roulette-section-value {
-    color: var(--roulette-text);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-
-.roulette-help {
-    color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-    line-height: 1.5;
-    margin: 0.2rem 0 0;
-}
-
-.roulette-range {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 4px;
-    background: var(--roulette-surface-2);
-    border-radius: 999px;
-    outline: none;
-    border: 1px solid var(--roulette-border);
-    cursor: pointer;
-}
-
-.roulette-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--roulette-accent);
-    border: 2px solid var(--roulette-bg);
-    box-shadow: 0 0 8px var(--roulette-glow);
-    cursor: grab;
-    transition: transform 120ms ease;
-}
-
-.roulette-range::-webkit-slider-thumb:active {
-    cursor: grabbing;
-    transform: scale(1.1);
-}
-
-.roulette-range::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--roulette-accent);
-    border: 2px solid var(--roulette-bg);
-    box-shadow: 0 0 8px var(--roulette-glow);
-    cursor: grab;
-}
-
-.roulette-range-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: var(--roulette-text-dim);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 0 4px;
-}
-
-/* ---------- Accent picker ---------- */
-
-.roulette-accent-row {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.roulette-swatch {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 2px solid var(--roulette-border-strong);
-    cursor: pointer;
-    padding: 0;
-    transition: transform 140ms ease, border-color 140ms ease, box-shadow 200ms ease;
-}
-
-.roulette-swatch:hover {
-    transform: scale(1.08);
-    border-color: var(--roulette-text-muted);
-}
-
-.roulette-swatch-active {
-    border-color: var(--roulette-text);
-    box-shadow: 0 0 12px -2px currentColor;
-}
-
-.roulette-accent-custom {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.2rem;
-}
-
-.roulette-accent-custom-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--roulette-text-muted);
-    font-size: 0.85rem;
-}
-
-.roulette-color-input {
-    width: 38px;
-    height: 30px;
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 5px;
+    padding: 0.7rem 0.8rem;
     background: var(--roulette-surface);
-    cursor: pointer;
-    padding: 2px;
-}
-
-.roulette-color-input::-webkit-color-swatch-wrapper {
-    padding: 0;
-}
-
-.roulette-color-input::-webkit-color-swatch {
-    border: none;
-    border-radius: 3px;
-}
-
-/* ---------- Profile palette display ---------- */
-
-.roulette-palette-row {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-}
-
-.roulette-palette-dot {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 1px solid var(--roulette-border-strong);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
-}
-
-/* Idle breathing on the active chamber halo. */
-.roulette-cylinder .roulette-chamber-halo {
-    transform-origin: center;
-    animation: roulette-breath calc(2500ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-}
-
-@keyframes roulette-breath {
-    from { opacity: 0.45; }
-    to   { opacity: 0.9; }
-}
-
-@keyframes roulette-pulse {
-    from { opacity: 0.55; box-shadow: 0 0 4px var(--roulette-glow); }
-    to   { opacity: 1;    box-shadow: 0 0 12px var(--roulette-glow-strong); }
-}
-
-/* Inactive chamber hover — colour/stroke only; transform is owned by the
- * SVG's positioning attribute and CSS transform here would teleport the
- * chamber to the SVG origin. */
-.roulette-cylinder .roulette-chamber {
-    cursor: pointer;
-}
-
-.roulette-cylinder .roulette-chamber circle {
-    transition: stroke 160ms ease, opacity 160ms ease, fill 160ms ease;
-}
-
-.roulette-cylinder .roulette-chamber:hover:not(.roulette-chamber-active) circle[stroke] {
-    stroke: var(--roulette-accent);
-}
-
-.roulette-cylinder .roulette-chamber-empty:hover circle {
-    opacity: 0.85;
-}
-
-.roulette-firing-notch {
-    transform-origin: center bottom;
-    animation: roulette-notch-glow calc(3000ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-    filter: drop-shadow(0 0 4px var(--roulette-glow));
-}
-
-@keyframes roulette-notch-glow {
-    from { filter: drop-shadow(0 0 2px var(--roulette-glow)); }
-    to   { filter: drop-shadow(0 0 8px var(--roulette-glow-strong)); }
-}
-
-/* ============================================================
- * Action button row
- * ============================================================ */
-
-.roulette-action-row {
-    display: flex;
-    justify-content: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-}
-
-.roulette-action-row-disabled {
-    opacity: 0.4;
-    pointer-events: none;
-}
-
-.roulette-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 1.1rem;
-    border-radius: 6px;
-    border: 1px solid var(--roulette-border-strong);
-    background: var(--roulette-surface);
-    color: var(--roulette-text);
-    font: inherit;
-    font-size: 0.92rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    cursor: pointer;
-    transition:
-        transform 160ms var(--roulette-spring),
-        background-color 160ms ease,
-        border-color 160ms ease,
-        box-shadow 160ms ease;
-}
-
-.roulette-action i {
-    font-size: 0.9em;
-}
-
-.roulette-action:hover {
-    background: var(--roulette-surface-2);
-    border-color: var(--roulette-accent-soft);
-}
-
-.roulette-action:active {
-    transform: scale(0.97);
-}
-
-.roulette-action-primary {
-    border-color: var(--roulette-accent-soft);
-    color: var(--roulette-accent);
-    box-shadow: 0 0 0 0 var(--roulette-glow);
-}
-
-.roulette-action-primary:hover {
-    border-color: var(--roulette-accent);
-    background: linear-gradient(180deg, var(--roulette-surface-2), var(--roulette-surface));
-    box-shadow: 0 0 16px -4px var(--roulette-glow-strong);
-}
-
-.roulette-action-info {
-    color: var(--roulette-info);
-}
-
-.roulette-action-info:hover {
-    border-color: var(--roulette-info);
-    box-shadow: 0 0 14px -4px rgba(107, 168, 199, 0.5);
-}
-
-.roulette-action-stop {
-    color: var(--roulette-stop);
-}
-
-.roulette-action-stop:hover {
-    border-color: var(--roulette-stop);
-    box-shadow: 0 0 14px -4px rgba(217, 102, 102, 0.5);
-}
-
-.roulette-action-go {
-    color: var(--roulette-go);
-}
-
-.roulette-action-go:hover {
-    border-color: var(--roulette-go);
-    box-shadow: 0 0 14px -4px rgba(111, 191, 115, 0.5);
-}
-
-/* ============================================================
- * Floating widget
- * ============================================================
- * Position: fixed; left/top driven by inline style from widget.js drag
- * handler. Glassmorphism applied with backdrop-blur + inset highlight,
- * matching the modal aesthetic. Two visual modes via the
- * .roulette-widget-collapsed class.
- */
-
-.roulette-widget {
-    position: fixed;
-    z-index: 9999;
-    width: 240px;
-    background: rgba(var(--roulette-bg-rgb), 0.85);
-    backdrop-filter: blur(14px) saturate(120%);
-    -webkit-backdrop-filter: blur(14px) saturate(120%);
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 10px;
-    color: var(--roulette-text);
-    box-shadow:
-        inset 0 1px 0 rgba(var(--roulette-text-rgb), 0.08),
-        0 12px 40px -10px rgba(0, 0, 0, 0.7);
-    user-select: none;
-    transition:
-        width 200ms var(--roulette-spring),
-        height 200ms var(--roulette-spring),
-        opacity 180ms ease,
-        transform 200ms var(--roulette-spring);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .roulette-widget {
-        background: var(--roulette-bg);
-    }
-}
-
-.roulette-widget-hidden {
-    opacity: 0;
-    pointer-events: none;
-    transform: scale(0.95);
-}
-
-.roulette-widget-dragging {
-    transition: none;
-    cursor: grabbing !important;
-}
-
-/* Drag handle row — title + actions, hover surface for cursor: grab */
-.roulette-widget-handle {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.55rem;
-    border-bottom: 1px solid var(--roulette-border);
-    cursor: grab;
-}
-
-.roulette-widget-grip {
-    color: var(--roulette-text-dim);
-    font-size: 0.75rem;
-    line-height: 1;
-}
-
-.roulette-widget-title {
-    flex: 1;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--roulette-accent);
-}
-
-.roulette-widget-actions {
-    display: inline-flex;
-    gap: 0.15rem;
-}
-
-.roulette-widget-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: var(--roulette-text-muted);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: transform 160ms var(--roulette-spring), color 160ms ease, background-color 160ms ease;
-    padding: 0;
-}
-
-.roulette-widget-btn:hover {
-    color: var(--roulette-text);
-    background: rgba(var(--roulette-text-rgb), 0.06);
-}
-
-.roulette-widget-btn:active {
-    transform: scale(0.9);
-}
-
-/* Body — cylinder + status + history */
-.roulette-widget-body {
-    display: flex;
-    flex-direction: column;
-}
-
-.roulette-widget-cylinder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.8rem 0.5rem 0.6rem;
-    cursor: pointer;
-    background:
-        radial-gradient(ellipse at center,
-            rgba(var(--roulette-accent-rgb), 0.05) 0%,
-            transparent 60%);
-}
-
-.roulette-widget-cylinder .roulette-cylinder {
-    width: 160px;
-    height: 160px;
-}
-
-.roulette-widget-empty {
-    padding: 1.2rem 0.5rem;
-    text-align: center;
-    color: var(--roulette-text-dim);
-    font-style: italic;
-    font-size: 0.85rem;
-}
-
-.roulette-widget-status {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.7rem 0.55rem;
-    border-bottom: 1px solid var(--roulette-border);
-    font-size: 0.82rem;
-    overflow: hidden;
-}
-
-.roulette-widget-status-dot {
-    flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    box-shadow: 0 0 6px currentColor;
-}
-
-.roulette-widget-status-name {
-    flex: 1;
-    color: var(--roulette-text);
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.roulette-widget-status-counter {
-    flex-shrink: 0;
-    color: var(--roulette-text-muted);
-    font-size: 0.75rem;
-    padding: 0.1rem 0.4rem;
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 999px;
-    background: rgba(var(--roulette-surface-rgb), 0.4);
-}
-
-.roulette-widget-status-paused {
-    color: var(--roulette-stop);
-    font-style: italic;
-    font-size: 0.7rem;
-}
-
-.roulette-widget-status-idle {
-    color: var(--roulette-text-dim);
-    font-style: italic;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* History dropdown */
-.roulette-widget-history-toggle {
-    appearance: none;
-    -webkit-appearance: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: transparent;
-    border: none;
-    padding: 0.45rem 0.7rem;
-    cursor: pointer;
-    width: 100%;
-    text-align: left;
-    color: var(--roulette-text-muted);
-    transition: background-color 140ms ease;
-}
-
-.roulette-widget-history-toggle:hover {
-    background: rgba(var(--roulette-text-rgb), 0.04);
-}
-
-.roulette-widget-history-toggle .roulette-section-title {
-    font-size: 0.7rem;
-    padding-left: 0.4rem;
-    line-height: 1.2;
-}
-
-.roulette-widget-chevron {
-    color: var(--roulette-text-dim);
-    font-size: 0.7rem;
-    transition: transform 200ms var(--roulette-spring);
-}
-
-.roulette-widget-history-open .roulette-widget-chevron {
-    transform: rotate(180deg);
-}
-
-.roulette-widget-history {
-    display: none;
-    padding: 0.2rem 0.5rem 0.55rem;
-    max-height: 220px;
-    overflow-y: auto;
-}
-
-.roulette-widget-history-open .roulette-widget-history {
-    display: block;
-}
-
-.roulette-widget-history-row {
-    display: grid;
-    grid-template-columns: 8px 2.4em 1fr auto;
-    gap: 0.4rem;
-    align-items: center;
-    padding: 0.25rem 0.35rem;
-    border-radius: 4px;
-    font-size: 0.72rem;
-    line-height: 1.3;
-}
-
-.roulette-widget-history-row:hover {
-    background: rgba(var(--roulette-text-rgb), 0.04);
-}
-
-.roulette-widget-history-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
-}
-
-.roulette-widget-history-id {
-    color: var(--roulette-text-dim);
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 0.72rem;
-}
-
-.roulette-widget-history-profile {
-    color: var(--roulette-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.roulette-widget-history-time {
-    color: var(--roulette-text-dim);
-    font-size: 0.7rem;
-}
-
-.roulette-widget-history-empty {
-    padding: 0.6rem;
-    text-align: center;
-    color: var(--roulette-text-dim);
-    font-style: italic;
-    font-size: 0.78rem;
-}
-
-/* Collapsed mode — just the icon dot */
-.roulette-widget-collapsed {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    overflow: hidden;
-}
-
-.roulette-widget-collapsed .roulette-widget-handle {
-    border-bottom: none;
-    padding: 0;
-    height: 100%;
-    justify-content: center;
-}
-
-.roulette-widget-collapsed .roulette-widget-grip,
-.roulette-widget-collapsed .roulette-widget-title,
-.roulette-widget-collapsed .roulette-widget-actions,
-.roulette-widget-collapsed .roulette-widget-body {
-    display: none;
-}
-
-.roulette-widget-collapsed-icon {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    color: var(--roulette-accent);
-    font-size: 1.1rem;
-    cursor: pointer;
-    filter: drop-shadow(0 0 6px var(--roulette-glow));
-    animation: roulette-pulse calc(2500ms / var(--roulette-anim-scale, 1)) ease-in-out infinite alternate;
-}
-
-.roulette-widget-collapsed .roulette-widget-collapsed-icon {
-    display: flex;
-}
-
-/* ============================================================
- * Responsive — tablet and phone breakpoints
- * ============================================================
- * Located at the END of the file so equal-specificity rules below
- * the base styles win in source order. Earlier iterations placed these
- * near the top alongside the chassis CSS and the base rules silently
- * undid them.
- */
-
-/* Tablet and below — collapse the side rail into a horizontal strip,
- * shrink padding, and let the cylinder size to its container. */
-/* ============================================================
- * Character bindings — "auto-start this queue for this character"
- *
- * Two surfaces: the contextual row under the Chamber tab's action row,
- * and the multi-select picker opened from a queue card.
- * ============================================================ */
-
-/* Queue-card chip showing how many characters auto-start this queue. */
-.roulette-tag-bound {
-    color: var(--roulette-info);
-    border-color: rgba(107, 168, 199, 0.45);
-    background: rgba(107, 168, 199, 0.1);
-}
-
-.roulette-tag-bound i {
-    margin-right: 0.2em;
-}
-
-/* --- Chamber tab: current-character binding row --- */
-
-.roulette-bind-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.75rem;
-    margin: 0 auto;
-    padding: 0.6rem 0.9rem;
-    max-width: 32rem;
     border: 1px solid var(--roulette-border);
-    border-radius: 0.6rem;
-    background: rgba(var(--roulette-bg-rgb), 0.6);
+    border-radius: 7px;
 }
 
-.roulette-bind-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: 0.85rem;
-    color: var(--roulette-text-muted);
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.roulette-bind-label i {
-    color: var(--roulette-accent-soft);
-}
-
-.roulette-bind-label b {
-    color: var(--roulette-text);
-    font-weight: 600;
-}
-
-.roulette-bind-select {
-    flex: 1 1 12rem;
-    min-width: 0;
-    max-width: 18rem;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.85rem;
-    color: var(--roulette-text);
-    background: var(--roulette-surface-2);
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 0.4rem;
-    cursor: pointer;
-}
-
-.roulette-bind-select:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.roulette-bind-select:focus-visible {
-    outline: 2px solid var(--roulette-accent);
-    outline-offset: 1px;
-}
-
-/* --- Binding picker popup --- */
+/* ============================================================
+ * Binding picker popup
+ * ============================================================ */
 
 .roulette-binding-picker {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    min-width: min(28rem, 80vw);
+    gap: 0.55rem;
+    color: var(--roulette-text);
     text-align: left;
 }
 
 .roulette-binding-blurb {
     margin: 0;
-    font-size: 0.85rem;
-    line-height: 1.4;
+    font-size: 0.76rem;
+    line-height: 1.45;
 }
 
-.roulette-binding-search {
-    width: 100%;
-    padding: 0.4rem 0.6rem;
-    color: var(--roulette-text);
-    background: var(--roulette-surface-2);
-    border: 1px solid var(--roulette-border-strong);
-    border-radius: 0.4rem;
-}
+.roulette-binding-search { width: 100%; }
 
 .roulette-binding-list {
     display: flex;
     flex-direction: column;
-    /* Cap the height so a large character roster scrolls inside the popup
-     * instead of pushing the Save button off-screen. */
-    max-height: min(22rem, 50vh);
+    max-height: 300px;
     overflow-y: auto;
-    border: 1px solid var(--roulette-border);
-    border-radius: 0.5rem;
-    background: rgba(var(--roulette-bg-rgb), 0.5);
 }
 
 .roulette-binding-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.4rem 0.65rem;
+    height: 30px;
+    padding: 0 0.4rem;
     border-bottom: 1px solid var(--roulette-border);
-    cursor: pointer;
-    transition: background 0.12s ease;
-}
-
-.roulette-binding-row:last-child {
-    border-bottom: none;
-}
-
-.roulette-binding-row:hover {
-    background: var(--roulette-surface-glass);
-}
-
-.roulette-binding-row input[type="checkbox"] {
-    flex: 0 0 auto;
+    font-size: 0.8rem;
     cursor: pointer;
 }
+
+.roulette-binding-row:hover { background: var(--roulette-surface); }
 
 .roulette-binding-name {
-    flex: 1 1 auto;
-    min-width: 0;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--roulette-text);
 }
 
 .roulette-binding-note {
-    flex: 0 0 auto;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 0.05rem 0.4rem;
-    border-radius: 999px;
-    border: 1px solid transparent;
+    margin-left: auto;
+    font-size: 0.68rem;
+    white-space: nowrap;
 }
 
-.roulette-binding-note-conflict {
-    color: var(--roulette-accent);
-    border-color: var(--roulette-accent-soft);
-    background: rgba(var(--roulette-accent-rgb), 0.1);
+.roulette-binding-note-missing { color: var(--roulette-stop); }
+.roulette-binding-note-conflict { color: var(--roulette-text-dim); }
+
+/* The binding picker rides inside ST's generic popup, which is themed by
+ * ST — keep our canvas identity there too. */
+.popup:has(.roulette-binding-picker) {
+    background: var(--roulette-bg);
+    color: var(--roulette-text);
+    border: 1px solid var(--roulette-border-strong);
 }
 
-.roulette-binding-note-missing {
-    color: var(--roulette-stop);
-    border-color: rgba(217, 102, 102, 0.45);
-    background: rgba(217, 102, 102, 0.1);
-}
+/* ============================================================
+ * Responsive — keep these LAST (source order beats earlier rules)
+ * ============================================================ */
 
-@media (max-width: 720px) {
-    /* Floating widget is desktop-only — pill + modal handle mobile. */
-    .roulette-widget {
-        display: none !important;
-    }
-
+@media (max-width: 900px) {
     .roulette-modal-body {
-        grid-template-columns: 1fr !important;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
     }
 
     .roulette-tab-rail {
         flex-direction: row;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding: 0.4rem 0.5rem;
-        gap: 0.3rem;
         border-right: none;
         border-bottom: 1px solid var(--roulette-border);
+        padding: 0.35rem 0.5rem;
     }
 
-    /* Horizontal-strip tabs: no left accent border, content-width only,
-     * no shrinking so the row scrolls when it overflows. */
     .roulette-tab {
-        flex-shrink: 0;
-        margin-left: 0;
-        padding: 0.5rem 0.8rem;
         border-left: none;
-        border-bottom: 3px solid transparent;
+        margin-left: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 5px 5px 0 0;
     }
 
     .roulette-tab.roulette-tab-active {
-        border-left: none;
+        border-left-color: transparent;
         border-bottom-color: var(--roulette-accent);
-    }
-
-    .roulette-tab-content {
-        padding: 1rem 0.9rem;
-    }
-
-    /* Cylinder shrinks to fit the stage (which is now full-width). The
-     * SVG is viewBox-based so it scales without distortion. */
-    .roulette-cylinder {
-        width: min(360px, 100%, 60vh);
-        height: min(360px, 100%, 60vh);
-    }
-
-    .roulette-chamber-stage {
-        min-height: 280px;
-    }
-
-    /* Sticky editor header offset must match the new tab-content top
-     * padding (1rem) so it docks to the visible top edge. */
-    .roulette-editor-header {
-        top: -1rem;
     }
 }
 
-/* Phone-class widths — popup goes full-width, tab labels collapse to
- * icon-only (ARIA labels still announce the destination). */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
     .popup:has(.roulette-modal),
     .popup.large_dialogue_popup:has(.roulette-modal),
     .popup.wide_dialogue_popup:has(.roulette-modal) {
-        width: 100vw !important;
-        max-width: 100vw !important;
-        border-radius: 0;
-        border-left: none;
-        border-right: none;
-    }
-
-    .roulette-modal {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: 95vh;
         border-radius: 0;
     }
 
-    /* Icon-only tabs free up ~140px of horizontal space so all four fit
-     * without scrolling on most phones. The <span> labels are visually
-     * hidden but stay in the DOM for screen readers + the aria-label
-     * carries the same info. */
-    .roulette-tab span {
-        display: none;
+    .roulette-tab span { display: none; }
+
+    .roulette-tab { padding: 0.45rem 0.8rem; }
+
+    .roulette-tab-content { padding: 0.7rem 0.75rem; }
+
+    /* Narrow chat column: drop the queue-name select's width, let the
+     * profile label truncate harder. */
+    .roulette-bar { gap: 0.45rem; padding: 4px 8px; }
+
+    .roulette-bar-queue { max-width: 140px; }
+
+    .roulette-rot-bind {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    .roulette-tab i {
-        font-size: 1.1rem;
-    }
-
-    .roulette-tab {
-        padding: 0.55rem 0.9rem;
-    }
-
-    /* Tighter modal header — close button stays the priority tap target. */
-    .roulette-modal-header {
-        padding: 0.6rem 0.8rem;
-    }
-
-    .roulette-modal-title {
-        font-size: 0.95rem;
-    }
-
-    .roulette-cylinder {
-        width: min(320px, 100%, 55vh);
-        height: min(320px, 100%, 55vh);
-    }
-}
-
-/* ============================================================
- * Accessibility — reduced motion
- * ============================================================
- * Honour the user's prefers-reduced-motion preference. Cylinder spins,
- * pip flashes, ignition flares, breathing pulses — all become instant
- * jumps so the rotation logic still works but no motion sickness vector.
- */
-
-@media (prefers-reduced-motion: reduce) {
-    .roulette-extension *,
-    .roulette-extension *::before,
-    .roulette-extension *::after {
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.001ms !important;
-    }
-    /* The pivot still needs to rotate — just instantaneously. */
-    .roulette-cylinder-pivot {
-        transition: transform 0.001ms !important;
-    }
-}
-
-/* Pill (in-chat input) — uses ST CSS variables to blend with the chat
- * chrome. The button reset removes default <button> outlines. */
-
-.roulette-pill {
-    appearance: none;
-    -webkit-appearance: none;
-}
-
-.roulette-pill:focus {
-    outline: none;
-}
-
-.roulette-pill:focus-visible {
-    outline: 2px solid var(--roulette-accent, var(--SmartThemeBodyColor));
-    outline-offset: 2px;
+    .roulette-rot-bind .roulette-select { max-width: none; }
 }
