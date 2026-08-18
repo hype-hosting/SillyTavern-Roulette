@@ -22,9 +22,11 @@ The v2.0 UI has two surfaces:
   column, at a user-chosen position (above the message input by default; below
   it, or above the chat log). It renders the rotation as a **linear dot strip**:
   one colored dot per slot in queue order, the active slot grown into a lit
-  capsule carrying its responses-remaining count. Idle shows the same dots
-  hollow, plus a queue picker and ▶ for one-click starting. Skip / Stop
-  (⇄ Resume when paused) and the gear that opens the modal live on its right.
+  capsule carrying its responses-remaining count. Controls cluster at the
+  bar's left edge — the gear that opens the modal leads, then ▶ (Skip / Stop,
+  ⇄ Resume when paused, while running), then the queue picker (profile name
+  while running) with the dot strip to its right. Idle shows the same dots
+  hollow for one-click starting.
 - **The modal** (`src/ui/modal.js`) — three tabs: **Rotation** (panel-size dot
   strip, status, actions, character auto-start binding, and the pick history),
   **Queues** (card grid + inline editor), **Settings** (bar visibility +
@@ -195,12 +197,15 @@ inside ST's chat column at `ui.bar.position`:
 | `below-input` | `after` `#send_form` |
 | `above-chat` | `before` `#chat` |
 
+Left-to-right order in every state: gear · transport buttons · queue label ·
+dot strip, with the free space to the right of the dots.
+
 States:
-- **Idle** — hollow dots previewing `preferredQueue()` (the last-run queue,
-  falling back to the first defined), a queue `<select>`, and ▶. Starting with
-  no queues routes to the modal's Queues tab instead.
-- **Running** — lit dots with the active slot's counter, profile name (with
-  color dot), Skip, Stop, gear.
+- **Idle** — gear, ▶, a queue `<select>`, and hollow dots previewing
+  `preferredQueue()` (the last-run queue, falling back to the first defined).
+  Starting with no queues routes to the modal's Queues tab instead.
+- **Running** — gear, Skip, Stop, profile name (with color dot), lit dots
+  with the active slot's counter.
 - **Paused (manual override)** — strip dims/desaturates, label reads "paused",
   Stop swaps to Resume in place.
 
