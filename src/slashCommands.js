@@ -4,6 +4,8 @@
  *   /roulette-stop                deactivate rotation
  *   /roulette-status              print current rotation state as a system msg
  *   /roulette-skip                force-advance to the next slot
+ *   /roulette-bind <queueName>    auto-start a queue for the current character
+ *   /roulette-unbind              remove the current character's binding
  */
 
 import { SlashCommandParser } from '../../../../../scripts/slash-commands/SlashCommandParser.js';
@@ -13,7 +15,14 @@ import {
     ARGUMENT_TYPE,
 } from '../../../../../scripts/slash-commands/SlashCommandArgument.js';
 import { getSettings, findQueue, getChatState } from './state.js';
-import { startRotation, stopRotation, skipCurrentSlot } from './events.js';
+import { startRotation, stopRotation, skipCurrentSlot, reevaluateAutoActivation } from './events.js';
+import {
+    getCurrentCharacter,
+    getBoundQueueId,
+    setBinding,
+    clearBinding,
+    isGroupChat,
+} from './characterBinding.js';
 
 function findQueueByName(name) {
     if (!name) return null;
@@ -105,6 +114,61 @@ export function registerSlashCommands() {
             const queue = findQueue(state.activeQueueId);
             const slot = queue?.slots.find(s => s.id === state.currentSlotId);
             return slot?.profileName ?? '';
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-bind',
+        helpString: 'Bind the current character to a queue, so opening their chats '
+            + 'starts that queue automatically. Not available in group chats.',
+        returns: 'name of the bound queue, or empty on failure',
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'Queue name (as defined in Roulette settings)',
+                isRequired: true,
+                typeList: [ARGUMENT_TYPE.STRING],
+                enumProvider: queueNameProvider,
+            }),
+        ],
+        callback: async (_args, value) => {
+            const character = getCurrentCharacter();
+            if (!character) {
+                const why = isGroupChat()
+                    ? 'bindings do not apply to group chats'
+                    : 'no character is loaded';
+                if (typeof toastr !== 'undefined') toastr.warning(`Roulette: ${why}.`);
+                return '';
+            }
+            const name = String(value ?? '').trim();
+            const queue = findQueueByName(name);
+            if (!queue) {
+                if (typeof toastr !== 'undefined') toastr.error(`Roulette: queue "${name}" not found.`);
+                return '';
+            }
+            setBinding(character.key, queue.id);
+            // Take effect in the chat we're already in, not just future loads.
+            await reevaluateAutoActivation();
+            return queue.name;
+        },
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'roulette-unbind',
+        helpString: 'Remove the current character\'s queue binding. Any rotation '
+            + 'already running in this chat keeps going.',
+        returns: 'name of the queue that was unbound, or empty if there was none',
+        callback: async () => {
+            const character = getCurrentCharacter();
+            if (!character) {
+                const why = isGroupChat()
+                    ? 'bindings do not apply to group chats'
+                    : 'no character is loaded';
+                if (typeof toastr !== 'undefined') toastr.warning(`Roulette: ${why}.`);
+                return '';
+            }
+            const previous = findQueue(getBoundQueueId(character.key));
+            if (!clearBinding(character.key)) return '';
+            return previous?.name ?? '';
         },
     }));
 }

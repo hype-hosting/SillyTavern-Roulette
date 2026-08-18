@@ -23,6 +23,12 @@ function defaultSettings() {
         version: 1,
         queues: [],            // Queue[]
         defaultQueueId: null,  // optional: queue used as initial pick when starting a new chat
+        // Per-character queue bindings, keyed by the character's avatar
+        // filename (ST's canonical stable character id — `this_chid` is a
+        // volatile array index and must never be persisted).
+        //   { [avatarFilename: string]: queueId }
+        // Group chats are deliberately excluded; see src/characterBinding.js.
+        characterQueues: {},
         ui: {
             animScale: 1,        // 0.25 - 2 (multiplier for every animation duration)
             accentColor: null,   // null = default brass; otherwise a CSS color string
@@ -49,6 +55,10 @@ export function getSettings() {
     if (!Array.isArray(s.queues)) s.queues = [];
     if (typeof s.version !== 'number') s.version = 1;
     if (s.defaultQueueId === undefined) s.defaultQueueId = null;
+    // Backfill the character-binding map — installs predating v1.3 lack it.
+    if (!s.characterQueues || typeof s.characterQueues !== 'object' || Array.isArray(s.characterQueues)) {
+        s.characterQueues = {};
+    }
     if (!s.ui || typeof s.ui !== 'object') s.ui = { animScale: 1, accentColor: null };
     if (typeof s.ui.animScale !== 'number') s.ui.animScale = 1;
     if (s.ui.accentColor === undefined) s.ui.accentColor = null;
@@ -102,6 +112,13 @@ export function deleteQueue(queueId) {
     settings.queues.splice(i, 1);
     if (settings.defaultQueueId === queueId) {
         settings.defaultQueueId = null;
+    }
+    // Drop any character bindings that pointed at this queue, otherwise the
+    // map accumulates dangling ids that resolve to nothing on chat load.
+    // Done inline rather than via characterBinding.js: that module imports
+    // this one, and routing the prune back through it would form a cycle.
+    for (const [avatar, boundId] of Object.entries(settings.characterQueues ?? {})) {
+        if (boundId === queueId) delete settings.characterQueues[avatar];
     }
     persistSettings();
     return true;

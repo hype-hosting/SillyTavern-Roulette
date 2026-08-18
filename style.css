@@ -2043,6 +2043,173 @@
 
 /* Tablet and below — collapse the side rail into a horizontal strip,
  * shrink padding, and let the cylinder size to its container. */
+/* ============================================================
+ * Character bindings — "auto-start this queue for this character"
+ *
+ * Two surfaces: the contextual row under the Chamber tab's action row,
+ * and the multi-select picker opened from a queue card.
+ * ============================================================ */
+
+/* Queue-card chip showing how many characters auto-start this queue. */
+.roulette-tag-bound {
+    color: var(--roulette-info);
+    border-color: rgba(107, 168, 199, 0.45);
+    background: rgba(107, 168, 199, 0.1);
+}
+
+.roulette-tag-bound i {
+    margin-right: 0.2em;
+}
+
+/* --- Chamber tab: current-character binding row --- */
+
+.roulette-bind-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    margin: 0 auto;
+    padding: 0.6rem 0.9rem;
+    max-width: 32rem;
+    border: 1px solid var(--roulette-border);
+    border-radius: 0.6rem;
+    background: rgba(var(--roulette-bg-rgb), 0.6);
+}
+
+.roulette-bind-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--roulette-text-muted);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.roulette-bind-label i {
+    color: var(--roulette-accent-soft);
+}
+
+.roulette-bind-label b {
+    color: var(--roulette-text);
+    font-weight: 600;
+}
+
+.roulette-bind-select {
+    flex: 1 1 12rem;
+    min-width: 0;
+    max-width: 18rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    color: var(--roulette-text);
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 0.4rem;
+    cursor: pointer;
+}
+
+.roulette-bind-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.roulette-bind-select:focus-visible {
+    outline: 2px solid var(--roulette-accent);
+    outline-offset: 1px;
+}
+
+/* --- Binding picker popup --- */
+
+.roulette-binding-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: min(28rem, 80vw);
+    text-align: left;
+}
+
+.roulette-binding-blurb {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.roulette-binding-search {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    color: var(--roulette-text);
+    background: var(--roulette-surface-2);
+    border: 1px solid var(--roulette-border-strong);
+    border-radius: 0.4rem;
+}
+
+.roulette-binding-list {
+    display: flex;
+    flex-direction: column;
+    /* Cap the height so a large character roster scrolls inside the popup
+     * instead of pushing the Save button off-screen. */
+    max-height: min(22rem, 50vh);
+    overflow-y: auto;
+    border: 1px solid var(--roulette-border);
+    border-radius: 0.5rem;
+    background: rgba(var(--roulette-bg-rgb), 0.5);
+}
+
+.roulette-binding-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.65rem;
+    border-bottom: 1px solid var(--roulette-border);
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.roulette-binding-row:last-child {
+    border-bottom: none;
+}
+
+.roulette-binding-row:hover {
+    background: var(--roulette-surface-glass);
+}
+
+.roulette-binding-row input[type="checkbox"] {
+    flex: 0 0 auto;
+    cursor: pointer;
+}
+
+.roulette-binding-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--roulette-text);
+}
+
+.roulette-binding-note {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.roulette-binding-note-conflict {
+    color: var(--roulette-accent);
+    border-color: var(--roulette-accent-soft);
+    background: rgba(var(--roulette-accent-rgb), 0.1);
+}
+
+.roulette-binding-note-missing {
+    color: var(--roulette-stop);
+    border-color: rgba(217, 102, 102, 0.45);
+    background: rgba(217, 102, 102, 0.1);
+}
+
 @media (max-width: 720px) {
     /* Floating widget is desktop-only — pill + modal handle mobile. */
     .roulette-widget {

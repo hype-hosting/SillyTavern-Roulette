@@ -2,7 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
-**Version:** 1.0.0
+**Version:** 1.3.0
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -33,6 +33,9 @@ Use `eventSource.on(event_types.X, handler)` for all of these. Import `eventSour
 - `MESSAGE_SWIPED` — fires when the user navigates between **existing** swipes via the left/right arrows; not on swipe-regeneration. Largely irrelevant to the scheduler since the `type` filter on `MESSAGE_RECEIVED`/`GENERATION_STARTED` already handles regen-swipes.
 - `CHAT_CHANGED` — emitted as `'chat_id_changed'`. Reload per-chat rotation state when the user switches chats.
 - `CONNECTION_PROFILE_LOADED` — fires for **both** manual user switches *and* our own programmatic `/profile` calls (verified: see "Verified ST internals"). The handler must consult an internal `isInternalSwitch` flag we set immediately before firing `/profile` and clear inside the handler — otherwise we trip our own manual-override path on every rotation.
+- `CHARACTER_DELETED` — emitted with `({ id, character })`. Purge that character's queue binding.
+- `CHARACTER_RENAMED` — emitted with `(oldAvatar, newAvatar)`. Avatar filenames track the character name, so a rename moves our binding key; re-point it or the binding is silently orphaned.
+- `APP_READY` — boot-time safety net for character-binding auto-start. `eventSource` is constructed with `autoFireAfterEmit` covering `APP_READY`, so a listener registered *after* the event already fired is invoked immediately with the last args. ST inits extensions before loading the first chat, so `CHAT_CHANGED` normally covers startup on its own; this is belt-and-braces for late-loading installs.
 
 **Generation type strings** (for the filter logic in `rotation.js`):
 - Advance counter / fire switch: `undefined` (normal user generation).
@@ -51,7 +54,7 @@ await executeSlashCommandsWithOptions(`/profile await=true ${profileName}`, { sh
 `/profile` does fuzzy matching by name via Fuse.js, so an exact-name validation pass against `extension_settings.connectionManager.profiles` is required *before* firing — otherwise a typo'd slot may silently switch to an unrelated profile.
 
 ### State storage
-- **Global settings** (rotation queues the user has defined, default rotation, UI preferences) → `extension_settings.roulette` (persisted via `saveSettingsDebounced()`).
+- **Global settings** (rotation queues the user has defined, default rotation, UI preferences, per-character queue bindings) → `extension_settings.roulette` (persisted via `saveSettingsDebounced()`).
 - **Per-chat rotation state** (which queue is active, current slot index, responses remaining in current slot, history of which profile generated which message) → `chat_metadata.roulette` (persisted via `saveMetadataDebounced()` from `../../../../scripts/extensions.js`).
 
 This split is deliberate: queue *definitions* are user-level assets reused across chats; *active rotation state* is chat-specific so different stories can run different rotations independently.
@@ -201,8 +204,66 @@ Register Roulette commands so power users can script:
 - `/roulette-stop` — deactivate rotation.
 - `/roulette-status` — print current state to the chat as a system message.
 - `/roulette-skip` — force-advance to the next slot immediately.
+- `/roulette-bind <queueName>` — bind the current character to a queue (auto-starts on chat load).
+- `/roulette-unbind` — remove the current character's binding.
 
 Use ST's `SlashCommandParser.addCommandObject()` (verify exact import at scaffold time).
+
+---
+
+### 9. Per-character queue bindings (v1.3)
+
+"Open this character's chat, run this queue." Bindings live in
+`extension_settings.roulette.characterQueues` as `{ [avatarFilename]: queueId }`.
+
+**Keying.** Characters are keyed by **avatar filename**, never by `this_chid`.
+`this_chid` is an index into the live `characters` array and shifts whenever a
+character is added, deleted, or the list is re-sorted — persisting it would
+silently re-point bindings at the wrong character. The avatar filename is what
+ST core and every bundled extension (quick-reply, gallery, attachments, stats)
+uses for per-character storage.
+
+**Group chats are excluded.** `getCurrentCharacter()` returns `null` while
+`groupId` is set, which makes every binding path inert there. This matches
+quick-reply's per-character config, which bails on `selected_group` for the
+same reason: a group has several members and no non-arbitrary answer to
+"whose binding wins?".
+
+**Activation rules.** The precedence logic is a pure function,
+`decideAutoActivation()` in `rotation.js`, so it can be tested without ST:
+
+| Situation | Action |
+|---|---|
+| No character (group chat / nothing loaded) | `none` |
+| Character has no binding | `none` |
+| `autoBindHandled` already set for this chat | `none` |
+| Chat already has a rotation running | `mark-handled` — never clobber it |
+| Bound queue no longer exists | `clear-binding` |
+| Otherwise | `start` |
+
+**The `autoBindHandled` latch** (per-chat, in `chat_metadata.roulette`) is what
+makes auto-start tolerable. `stopRotation()` sets it, so a rotation the user
+deliberately stopped does not resurrect every time the chat is reopened;
+`startRotation()` sets it too, since the question is then settled either way.
+`reevaluateAutoActivation()` clears it on purpose when the user changes a
+binding from the UI, so binding a character while sitting in their chat takes
+effect immediately instead of appearing to do nothing.
+
+Note the ordering: the running-rotation check comes *before* the stale-queue
+check, so we never mutate settings while a rotation the user cares about is
+mid-flight.
+
+**Lifecycle.** `CHARACTER_DELETED` purges the binding; `CHARACTER_RENAMED`
+moves it to the new avatar key; `deleteQueue()` prunes any bindings pointing at
+the removed queue (done inline in `state.js` — routing it through
+`characterBinding.js` would form an import cycle, since that module imports
+`state.js`).
+
+**UI.** Two surfaces, one map: a contextual `Auto-start for <character>` select
+in the Chamber tab, and a masks-icon character multi-select on each queue card
+in the Queues tab (`src/ui/bindingPicker.js`). A character has at most one
+queue, so the picker calls out characters already bound elsewhere rather than
+silently rebinding them.
 
 ---
 
@@ -222,17 +283,17 @@ These were called out as v2 / stretch in the original spec but landed in v1.0:
 
 - **Per-slot parameter overrides** beyond what the connection profile carries. v1.0 leans entirely on profiles; for "DeepSeek cold" vs "DeepSeek warm", make two profiles.
 - **Blind mode** (hide which profile generated which message until reveal).
-- **Per-character default queues** (auto-activate a queue when a particular character is loaded).
 - **Cross-chat statistics** (how often each profile was used over all time, summary dashboards).
 - **Drag-load metaphor (variant L)** — the queue's chambers being directly loaded by dragging profile chips onto the cylinder, with the queue abstraction implicit. v1.0 ships variant P (read-only Chamber tab; editing in Queues tab).
 
 ---
 
-## Repository structure (v1.0)
+## Repository structure (v1.3)
 
 ```
 SillyTavern-Roulette/
 ├── manifest.json              # ST extension manifest
+├── package.json               # node-only: `npm test`, type:module. ST ignores it.
 ├── index.js                   # entry point: init() wires every subsystem
 ├── style.css                  # scoped styles + --roulette-* token set
 ├── README.md                  # user-facing docs (value, install, recipes)
@@ -240,26 +301,45 @@ SillyTavern-Roulette/
 ├── LICENSE                    # AGPL-3.0
 ├── src/
 │   ├── state.js               # extension_settings + chat_metadata helpers; UI prefs
-│   ├── rotation.js            # PURE core rotation logic (no ST imports)
+│   ├── rotation.js            # PURE core logic (no ST imports) — scheduling + auto-activation rules
 │   ├── profileSwitcher.js     # /profile slash-command wrapper + isInternalSwitch flag
-│   ├── events.js              # ST event listeners + scheduler (start/stop/skip/spin)
+│   ├── events.js              # ST event listeners + scheduler (start/stop/skip/spin/auto-start)
+│   ├── characterBinding.js    # per-character queue bindings; ALL character-identity handling
+│   ├── sampling.js            # v1.2 per-slot sampler tuning via ST's preset system
 │   ├── slashCommands.js       # /roulette-* command definitions
 │   ├── exportImport.js        # queue JSON file download/upload helpers
 │   └── ui/
 │       ├── modal.js           # tabbed modal chassis (Chamber/Queues/History/Settings)
 │       ├── cylinder.js        # SVG glassy revolver-cylinder + spin animation
+│       ├── widget.js          # v1.1 floating draggable mini-cylinder panel
+│       ├── bindingPicker.js   # character multi-select popup, opened from a queue card
 │       ├── profileColors.js   # hash-based stable profile colour assignment
 │       ├── queueEditor.js     # form builder shared by popup + embedded paths
 │       ├── settingsPanel.js   # drawer block: status + quick actions + Open Roulette
 │       ├── statusIndicator.js # chat-input pill (icon by default, hover for details)
 │       ├── templates.html     # reserved for future fragments (currently empty)
 │       └── tabs/
-│           ├── chamber.js     # cylinder hero + status + Spin/Skip/Stop/Resume
+│           ├── chamber.js     # cylinder hero + status + actions + character-binding row
 │           ├── queues.js      # card grid + inline editor (replaces right pane)
 │           ├── history.js     # trail strip + per-pick rows
 │           └── settings.js    # animation-speed slider + accent-colour picker
+├── tests/
+│   └── rotation.test.mjs      # node --test over the pure core (no ST, no DOM, no mocks)
 └── .gitignore
 ```
+
+### Tests
+
+`src/rotation.js` imports nothing, so it runs under plain node:
+
+```
+npm test          # node --test tests/*.test.mjs
+```
+
+Covers slot sequencing, the `noRepeatInRow` guarantee, weighted distribution,
+the generation-type filter, and the auto-activation precedence rules. Anything
+touching ST's event system or the DOM stays in `TESTING.md` as a manual walk.
+Keep `rotation.js` ST-free — that property is what makes this possible.
 
 ### `manifest.json`
 
@@ -272,7 +352,7 @@ SillyTavern-Roulette/
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
@@ -380,8 +460,18 @@ Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR
 4. **`CONNECTION_PROFILE_LOADED` and our own switches** — confirmed: yes, the event fires for our `/profile` calls too (the change-handler at `public/scripts/extensions/connection-manager/index.js:752` emits unconditionally). We must use an `isInternalSwitch` flag.
 5. **Manifest schema** — fields ST honors: `display_name`, `loading_order`, `requires`, `optional`, `js`, `css`, `author`, `version`, `homePage` (camelCase), `auto_update`, `hooks` (`{activate: 'init'}` convention), plus optional `i18n` and `generate_interceptor`. All bundled extensions use `hooks.activate = 'init'` and we will too.
 6. **Popup helper** — yes: `Popup` class at `public/scripts/popup.js:148`, `callGenericPopup` at line 909, `POPUP_TYPE`/`POPUP_RESULT` enums. Use these instead of rolling a custom modal.
+7. **Character identity** — `getContext()` (re-exported from `public/scripts/extensions.js:14-18`, defined in `public/scripts/st-context.js:114`) returns `characters`, `characterId` (`this_chid`), `groupId` (`selected_group`), and `groups`. `characterId` is an **array index**, not a stable id: the canonical stable key is `characters[this_chid].avatar`, used throughout ST core (`chats.js`, `tags.js`, `stats.js`, `personas.js`) and by bundled extensions. Group ids (`groups[].id`) are server-assigned on create and stable.
+8. **`chat_metadata` is bound before `CHAT_CHANGED`** — `public/script.js:7598` assigns `chat_metadata` from the chat header; the event emits at `:7641`. Reading the incoming chat's rotation state inside a `CHAT_CHANGED` handler is therefore safe.
+9. **Extensions init before the first chat loads** — `firstLoadInit()` calls `await initExtensions()` (`public/script.js:745`) before `getCharacters()` and everything else, so listeners registered during extension init do receive the first `CHAT_CHANGED`.
+10. **`APP_READY` replays to late listeners** — `eventSource = new EventEmitter([APP_READY, APP_INITIALIZED])` (`public/scripts/events.js:113`); `EventEmitter.prototype.on` invokes the listener immediately if the event is in `autoFireAfterEmit` and has already fired (`public/lib/eventemitter.js`). Safe to rely on for catch-up work.
 
 ---
+
+## v1.1 – v1.3 — done
+
+- **v1.1** — floating draggable widget (`src/ui/widget.js`) mirroring the cylinder during chat; glassmorphism + spring-easing pass; RGB-tuple token system.
+- **v1.2** — per-slot inline sampler tuning (`src/sampling.js`) overlaid through ST's preset machinery, with managed presets cleaned up on slot/queue removal.
+- **v1.3** — per-character queue bindings (`src/characterBinding.js`, `src/ui/bindingPicker.js`) plus the first automated test coverage of the pure core.
 
 ## v1.0 milestone — done
 
@@ -389,7 +479,6 @@ The original v1 acceptance criteria all pass (see `TESTING.md` for the manual wa
 
 ## Future work
 
-- **Per-character default queues** (auto-activate when a character is loaded).
 - **Blind mode** — hide which profile generated which message until the user reveals.
 - **Drag-load chamber metaphor** — drop profile chips directly onto chambers; the queue becomes implicit. Bigger UX change; wait until users ask for it.
 - **Cross-chat statistics** — total runs per profile, distribution dashboards.

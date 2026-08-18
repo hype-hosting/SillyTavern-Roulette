@@ -3,8 +3,11 @@
  * Event wiring + scheduler. Listens to:
  *   - MESSAGE_RECEIVED        decrement counter (on countable types only)
  *   - GENERATION_STARTED      switch profile if a switch is pending
- *   - CHAT_CHANGED            reload state + refresh status indicator
+ *   - CHAT_CHANGED            reload state, refresh UI, auto-start bound queue
+ *   - APP_READY               catch boot-time auto-start if we registered late
  *   - CONNECTION_PROFILE_LOADED   detect manual override (ignore our own switches)
+ *   - CHARACTER_DELETED       purge that character's queue binding
+ *   - CHARACTER_RENAMED       follow the binding to the new avatar key
  */
 
 import { eventSource, event_types } from '../../../../../script.js';
@@ -16,9 +19,17 @@ import {
     indexOfSlot,
     appendHistory,
     rollSlotResponses,
+    decideAutoActivation,
 } from './rotation.js';
 import { switchProfile, isInternalSwitch, profileExists } from './profileSwitcher.js';
 import { applyTuningOnSwitch } from './sampling.js';
+import {
+    getCurrentCharacter,
+    getBoundQueueId,
+    clearBinding,
+    purgeBindingsForCharacter,
+    remapBinding,
+} from './characterBinding.js';
 
 /**
  * Per-rotation transient state, kept in-memory only:
@@ -74,6 +85,9 @@ export async function startRotation(queueId) {
         state.responsesAllotted = pick.responses;
         state.manuallyOverridden = false;
         state.lastSwitchMessageId = null;
+        // Whoever started this chat's rotation — the user or the character
+        // binding — has answered the auto-start question for this chat.
+        state.autoBindHandled = true;
     });
 
     const switched = await switchProfile(slot.profileName);
@@ -103,6 +117,10 @@ export function stopRotation() {
         state.currentSlotId = null;
         state.responsesRemaining = 0;
         state.manuallyOverridden = false;
+        // A stop is a deliberate choice about this chat. Without this the
+        // character binding would restart the rotation the next time the
+        // chat is opened, and the user could never turn it off.
+        state.autoBindHandled = true;
     });
     consecutiveFailures = 0;
     failedSlotIndices.clear();
@@ -301,14 +319,120 @@ async function onGenerationStarted(type, _options, dryRun) {
     }
 }
 
+/** Guards against two chat-load events racing into a double start. */
+let autoActivateInFlight = false;
+
+/**
+ * Start the queue bound to the current character, if the situation calls for
+ * it. Safe to call as often as you like — the precedence rules live in the
+ * pure decideAutoActivation() and the result is latched per-chat via
+ * `autoBindHandled`, so repeat calls are no-ops.
+ *
+ * @returns {Promise<void>}
+ */
+export async function maybeAutoActivateForCharacter() {
+    if (autoActivateInFlight) return;
+
+    const character = getCurrentCharacter();
+    const boundQueueId = character ? getBoundQueueId(character.key) : null;
+    const queue = boundQueueId ? findQueue(boundQueueId) : null;
+
+    const decision = decideAutoActivation({
+        hasCharacter: !!character,
+        boundQueueId,
+        queueExists: !!queue,
+        chatState: getChatState(),
+    });
+
+    if (decision.action === 'none') return;
+
+    if (decision.action === 'mark-handled') {
+        updateChatState(s => { s.autoBindHandled = true; });
+        return;
+    }
+
+    if (decision.action === 'clear-binding') {
+        console.warn(`[Roulette] "${character.name}" was bound to a queue that no longer exists — dropping the binding.`);
+        clearBinding(character.key);
+        notifyStateChanged();
+        return;
+    }
+
+    // decision.action === 'start'
+    autoActivateInFlight = true;
+    try {
+        const result = await startRotation(queue.id);
+        if (result.ok) {
+            console.log(`[Roulette] auto-started "${queue.name}" for ${character.name}`);
+            if (typeof toastr !== 'undefined') {
+                toastr.info(`Roulette: started "${queue.name}" for ${character.name}.`);
+            }
+        } else {
+            console.warn(`[Roulette] auto-start for ${character.name} failed: ${result.error}`);
+            if (typeof toastr !== 'undefined') {
+                toastr.warning(`Roulette: could not auto-start "${queue.name}" — ${result.error}`);
+            }
+        }
+    } finally {
+        autoActivateInFlight = false;
+    }
+}
+
+/**
+ * Re-open the auto-start question for the current chat, then answer it.
+ *
+ * Called when the user changes a binding from the UI. Without this, binding
+ * a character while already sitting in their chat would appear to do nothing
+ * until the chat was reopened — the `autoBindHandled` latch would still be
+ * set from this chat's earlier load.
+ *
+ * Clearing the latch cannot disturb a rotation that is already running:
+ * decideAutoActivation() returns 'mark-handled' for that case and leaves the
+ * active queue untouched.
+ *
+ * @returns {Promise<void>}
+ */
+export async function reevaluateAutoActivation() {
+    updateChatState(s => { s.autoBindHandled = false; });
+    await maybeAutoActivateForCharacter();
+}
+
 /**
  * CHAT_CHANGED handler: per-chat state lives in chat_metadata, which ST
- * rebinds when the chat changes — just notify the UI to re-render.
+ * rebinds *before* emitting this event (script.js sets chat_metadata during
+ * chat load and emits afterwards), so it is safe to read the new chat's
+ * rotation state here — and therefore safe to decide whether the incoming
+ * character's bound queue should auto-start.
  */
 async function onChatChanged(_chatId) {
     consecutiveFailures = 0;
     failedSlotIndices.clear();
     notifyStateChanged();
+    await maybeAutoActivateForCharacter();
+}
+
+/**
+ * CHARACTER_DELETED handler. ST emits `{ id, character }`; the character's
+ * avatar filename is our binding key.
+ */
+function onCharacterDeleted(payload) {
+    const avatar = payload?.character?.avatar;
+    if (!avatar) return;
+    if (purgeBindingsForCharacter(avatar)) {
+        console.log(`[Roulette] dropped queue binding for deleted character ${avatar}`);
+        notifyStateChanged();
+    }
+}
+
+/**
+ * CHARACTER_RENAMED handler. ST emits `(oldAvatar, newAvatar)` — the avatar
+ * filename tracks the character name, so a rename moves our storage key.
+ */
+function onCharacterRenamed(oldAvatar, newAvatar) {
+    if (remapBinding(oldAvatar, newAvatar)) {
+        console.log(`[Roulette] moved queue binding ${oldAvatar} -> ${newAvatar}`);
+        notifyStateChanged();
+    }
 }
 
 /**
@@ -344,6 +468,18 @@ export function registerEventListeners() {
     eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.CONNECTION_PROFILE_LOADED, onConnectionProfileLoaded);
+    eventSource.on(event_types.CHARACTER_DELETED, onCharacterDeleted);
+    eventSource.on(event_types.CHARACTER_RENAMED, onCharacterRenamed);
+    // Safety net for the boot-time case. ST inits extensions before loading
+    // the first chat, so CHAT_CHANGED normally covers startup on its own —
+    // but if this extension is ever loaded late, eventSource replays
+    // APP_READY to listeners that register after it fired (its
+    // autoFireAfterEmit set covers APP_READY), so we still catch up.
+    // Idempotent: the per-chat `autoBindHandled` latch absorbs the overlap.
+    eventSource.on(event_types.APP_READY, () => {
+        maybeAutoActivateForCharacter().catch(err =>
+            console.error('[Roulette] APP_READY auto-activate failed:', err));
+    });
 }
 
 /**

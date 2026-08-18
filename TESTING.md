@@ -113,8 +113,10 @@ In the chat input, type each command:
 - `/roulette-start seq-test` → activates `seq-test`. Pill becomes active.
 - `/roulette-skip` → forces an immediate slot advance. Pill profile changes; counter resets to the new slot's count.
 - `/roulette-stop` → deactivates. Pill dims.
+- `/roulette-bind seq-test` → binds the current character. Echoes `seq-test`.
+- `/roulette-unbind` → removes it. Echoes the queue name that was unbound.
 
-**Pass:** All four commands behave as described, with no console errors.
+**Pass:** All six commands behave as described, with no console errors.
 
 ## Criterion 14 — No console errors
 
@@ -125,6 +127,70 @@ Use Roulette normally for 5–10 minutes (start, stop, swipe, regen, switch chat
 ## Criterion 15 — Light + dark theme
 
 Deferred to the v1 release styling pass. The current scaffolded styles use ST CSS variables (`--SmartThemeBodyColor`, `--SmartThemeBlurTintColor`, `--SmartThemeBorderColor`) so they should at minimum be readable in both, but no manual audit has been done yet.
+
+## Criterion 16 — Per-character binding auto-starts
+
+Requires two character cards (call them **Alice** and **Bob**) and two queues.
+
+1. Open Alice's chat. In the modal's **Chamber** tab, set **Auto-start for Alice** to `seq-test`.
+   - Rotation should start immediately — the profile switches and the pill goes active.
+2. Switch to Bob's chat (no binding). Rotation should be off.
+3. Switch back to Alice, into a **new** chat.
+   - `seq-test` starts on its own before the first generation.
+
+**Pass:** Alice's chats auto-start `seq-test`; Bob's don't.
+
+## Criterion 17 — Bindings never clobber or resurrect a rotation
+
+The two rules that keep auto-start out of the user's way:
+
+1. **Running rotation wins.** In an Alice chat, `/roulette-start other-queue`.
+   Switch away and back. It must still be `other-queue`, not `seq-test`.
+2. **A stop sticks.** In an Alice chat, press **Stop**. Switch away and back.
+   Rotation must stay off — the binding must not restart it.
+
+**Pass:** Neither rule is violated. (Both are also covered by `npm test`.)
+
+## Criterion 18 — Binding lifecycle
+
+1. Bind Alice to a queue, then **delete that queue** in the Queues tab.
+   Reopen Alice's chat — no rotation starts, no console error, and the Chamber
+   dropdown reads "Nothing".
+2. Bind Alice to a queue, then **rename Alice** in ST. Reopen her chat —
+   the binding still applies under her new name.
+3. Bind Alice, then **delete Alice**. The queue card's binding count drops.
+
+**Pass:** No orphaned bindings, no errors.
+
+## Criterion 19 — Group chats are inert
+
+Open a group chat.
+
+- The Chamber tab's **Auto-start for…** row is hidden entirely.
+- `/roulette-bind seq-test` warns that bindings don't apply to group chats.
+- No rotation auto-starts, regardless of member bindings.
+
+**Pass:** Bindings have no effect in groups, and say so when asked.
+
+## Criterion 20 — Queue-card character picker
+
+In the Queues tab, click the masks icon on a queue card.
+
+- Every character is listed, filterable by the search box.
+- Characters bound to a *different* queue show a "currently &lt;queue&gt;" chip.
+- Ticking one and saving rebinds it; the card's count chip updates.
+
+**Pass:** Bindings round-trip correctly and conflicts are visible before saving.
+
+---
+
+## Automated coverage
+
+`npm test` (node 18+, no dependencies) runs `tests/rotation.test.mjs` over the
+pure core: slot sequencing, `noRepeatInRow`, weighted distribution, the
+generation-type filter, and the binding auto-activation precedence rules.
+It replaces hand-walking criteria 4, 7, 8 and the rule-checks in 17 — the
+criteria above remain the manual check that the wiring around them is right.
 
 ---
 

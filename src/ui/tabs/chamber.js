@@ -14,7 +14,8 @@
  */
 
 import { findQueue, getChatState, getSettings } from '../../state.js';
-import { startRotation, stopRotation, resumeRotation, skipCurrentSlot } from '../../events.js';
+import { startRotation, stopRotation, resumeRotation, skipCurrentSlot, reevaluateAutoActivation } from '../../events.js';
+import { getCurrentCharacter, getBoundQueueId, setBinding, clearBinding } from '../../characterBinding.js';
 import { renderCylinder, spinCylinderTo, rotationForActiveIndex } from '../cylinder.js';
 
 // Per-mounted-tab state.
@@ -45,6 +46,13 @@ export function mountChamberTab(container) {
             <div class="roulette-empty-hint hidden" data-field="empty-hint">
                 No queue active. Pick one in <b>Queues</b> or use the Start button in the Extensions drawer.
             </div>
+            <label class="roulette-bind-row hidden" data-field="bind-row">
+                <span class="roulette-bind-label">
+                    <i class="fa-solid fa-masks"></i>
+                    <span>Auto-start for <b data-field="bind-character"></b></span>
+                </span>
+                <select class="roulette-bind-select" data-field="bind-select"></select>
+            </label>
         </div>
     `;
 
@@ -72,6 +80,21 @@ export function mountChamberTab(container) {
     });
     container.querySelector('[data-act="resume"]').addEventListener('click', () => {
         resumeRotation();
+    });
+
+    container.querySelector('[data-field="bind-select"]').addEventListener('change', async (e) => {
+        const character = getCurrentCharacter();
+        if (!character) return;
+        const queueId = e.target.value;
+        if (queueId) {
+            setBinding(character.key, queueId);
+        } else {
+            clearBinding(character.key);
+        }
+        // Apply the binding to the chat we're sitting in, not just to future
+        // loads — otherwise setting a binding here looks like it did nothing.
+        await reevaluateAutoActivation();
+        refreshChamberTab(container);
     });
 
     refreshChamberTab(container);
@@ -162,6 +185,56 @@ export function refreshChamberTab(container) {
     }
 
     refreshMeta(container, queue, previewQueue, state);
+    refreshBindRow(container);
+}
+
+/**
+ * Character-binding control. Hidden entirely when bindings don't apply —
+ * group chats and "no character loaded" both yield null from
+ * getCurrentCharacter().
+ *
+ * The <select> is rebuilt on every refresh so newly created or deleted
+ * queues show up without needing a separate subscription.
+ */
+function refreshBindRow(container) {
+    const row = container.querySelector('[data-field="bind-row"]');
+    const select = container.querySelector('[data-field="bind-select"]');
+    const nameEl = container.querySelector('[data-field="bind-character"]');
+    if (!row || !select || !nameEl) return;
+
+    const character = getCurrentCharacter();
+    if (!character) {
+        row.classList.add('hidden');
+        return;
+    }
+    row.classList.remove('hidden');
+    nameEl.textContent = character.name;
+
+    const bound = getBoundQueueId(character.key) ?? '';
+    const queues = getSettings().queues;
+
+    select.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = queues.length ? 'Nothing — start manually' : 'No queues defined yet';
+    select.appendChild(none);
+    for (const q of queues) {
+        const opt = document.createElement('option');
+        opt.value = q.id;
+        opt.textContent = q.name;
+        select.appendChild(opt);
+    }
+    // A binding can outlive its queue (deleteQueue prunes, but an import or
+    // a hand-edited settings file can still leave one dangling). Show it
+    // rather than silently snapping the control back to "Nothing".
+    if (bound && !queues.some(q => q.id === bound)) {
+        const stale = document.createElement('option');
+        stale.value = bound;
+        stale.textContent = 'Missing queue — pick another';
+        select.appendChild(stale);
+    }
+    select.value = bound;
+    select.disabled = queues.length === 0;
 }
 
 /**

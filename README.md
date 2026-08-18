@@ -101,6 +101,34 @@ Mode: **Weighted-random** · run length range `1–2`.
 
 ---
 
+## Per-Character Queues
+
+Different characters want different rotations. A hard-boiled detective and a
+whimsical fae shopkeeper rarely benefit from the same blend of models.
+
+Bind a queue to a character once and it starts itself from then on:
+
+- **In the modal** — open **Chamber** while that character's chat is loaded and
+  pick a queue from **Auto-start for _character_**.
+- **From a queue** — in **Queues**, click the masks icon on a queue card and
+  tick every character that should use it.
+- **From chat** — `/roulette-bind Long-fiction blend`.
+
+Opening one of that character's chats then starts the queue and switches the
+connection profile before the first generation. Three rules keep it out of your
+way:
+
+| Situation | What happens |
+|---|---|
+| Chat already has a rotation running | Left completely alone — the running rotation always wins |
+| You stopped rotation in that chat | Stays stopped, even after reopening it |
+| Group chat | Bindings don't apply; a group has several members and no obvious winner |
+
+A character can have one queue; a queue can serve any number of characters.
+Renaming or deleting a character updates or removes its binding automatically.
+
+---
+
 ## Modes & Options
 
 | Mode | Behaviour |
@@ -120,8 +148,8 @@ Mode: **Weighted-random** · run length range `1–2`.
 
 | Tab | What it is |
 |---|---|
-| **Chamber** | The live cylinder. Brass collar around glassy chambers; active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration. |
-| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). Import / export as JSON for sharing. |
+| **Chamber** | The live cylinder. Brass collar around glassy chambers; active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration. Below it, an **Auto-start for _character_** picker binds the current character to a queue. |
+| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). The masks icon opens a character picker — bind many characters to one queue at once. Import / export as JSON for sharing. |
 | **History** | Every AI response logged with its profile of origin. Trail strip shows the last twelve, full list newest-first. |
 | **Settings** | Animation speed slider (0.25× to 2×), accent-colour picker (six metal presets + custom), profile-palette display. |
 
@@ -135,6 +163,8 @@ Mode: **Weighted-random** · run length range `1–2`.
 | `/roulette-stop` | Deactivate rotation |
 | `/roulette-status` | Print current state |
 | `/roulette-skip` | Force-advance to the next slot |
+| `/roulette-bind <queueName>` | Auto-start that queue whenever the current character is loaded |
+| `/roulette-unbind` | Remove the current character's binding |
 
 ---
 
@@ -142,7 +172,10 @@ Mode: **Weighted-random** · run length range `1–2`.
 
 | Version | Status | Notes |
 |---|---|---|
-| [v1.0](./CHANGELOG.md) | **Current** | Initial public release. Modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, animation/accent settings. |
+| v1.3 | **Current** | Per-character queue bindings — open a character's chat, their queue starts itself. |
+| v1.2 | | Inline sampler tuning per slot, overlaid through SillyTavern's preset system. |
+| v1.1 | | Floating draggable widget mirroring the cylinder during chat; glassmorphism pass. |
+| v1.0 | | Initial public release. Modal redesign, glassy cylinder, drag-to-reorder, simulate-20-picks, queue export/import, history view, animation/accent settings. |
 
 ---
 
