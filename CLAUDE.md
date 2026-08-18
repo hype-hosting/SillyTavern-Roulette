@@ -341,6 +341,10 @@ the generation-type filter, and the auto-activation precedence rules. Anything
 touching ST's event system or the DOM stays in `TESTING.md` as a manual walk.
 Keep `rotation.js` ST-free — that property is what makes this possible.
 
+`.github/workflows/test.yml` runs the same command on every pull request and
+on pushes to `main`. There is no install step because the extension has no
+dependencies — `node --test` is built into Node.
+
 ### `manifest.json`
 
 ```json

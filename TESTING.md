@@ -192,6 +192,10 @@ generation-type filter, and the binding auto-activation precedence rules.
 It replaces hand-walking criteria 4, 7, 8 and the rule-checks in 17 — the
 criteria above remain the manual check that the wiring around them is right.
 
+This runs automatically on GitHub for every pull request (see
+`.github/workflows/test.yml`), so a red cross on a PR means the scheduling
+core broke.
+
 ---
 
 ## Reporting
