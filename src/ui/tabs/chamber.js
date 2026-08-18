@@ -48,7 +48,7 @@ export function mountChamberTab(container) {
             </div>
             <label class="roulette-bind-row hidden" data-field="bind-row">
                 <span class="roulette-bind-label">
-                    <i class="fa-solid fa-masks"></i>
+                    <i class="fa-solid fa-user"></i>
                     <span>Auto-start for <b data-field="bind-character"></b></span>
                 </span>
                 <select class="roulette-bind-select" data-field="bind-select"></select>

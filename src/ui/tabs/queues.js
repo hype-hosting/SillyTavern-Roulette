@@ -175,7 +175,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
             <span class="roulette-tag roulette-tag-mode">${queue.mode}</span>
             <span class="roulette-tag">${queue.slots?.length ?? 0} chambers</span>
             ${hasTuning ? '<span class="roulette-tag roulette-tag-tuned" title="Has inline sampler tuning"><i class="fa-solid fa-sliders"></i> tuned</span>' : ''}
-            ${boundCount ? `<span class="roulette-tag roulette-tag-bound" title="Auto-starts for ${boundCount} character(s)"><i class="fa-solid fa-masks"></i> ${boundCount}</span>` : ''}
+            ${boundCount ? `<span class="roulette-tag roulette-tag-bound" title="Auto-starts for ${boundCount} character(s)"><i class="fa-solid fa-users"></i> ${boundCount}</span>` : ''}
             ${isActive ? '<span class="roulette-tag roulette-tag-active">active</span>' : ''}
         </div>
     `;
@@ -191,7 +191,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
             <i class="fa-solid fa-pen-to-square"></i>
         </button>
         <button class="roulette-icon-btn" data-card-act="bind" title="Auto-start for characters…">
-            <i class="fa-solid fa-masks"></i>
+            <i class="fa-solid fa-users"></i>
         </button>
         <button class="roulette-icon-btn" data-card-act="duplicate" title="Duplicate">
             <i class="fa-solid fa-copy"></i>

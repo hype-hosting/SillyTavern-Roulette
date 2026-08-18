@@ -110,8 +110,8 @@ Bind a queue to a character once and it starts itself from then on:
 
 - **In the modal** — open **Chamber** while that character's chat is loaded and
   pick a queue from **Auto-start for _character_**.
-- **From a queue** — in **Queues**, click the masks icon on a queue card and
-  tick every character that should use it.
+- **From a queue** — in **Queues**, click the characters icon on a queue card
+  and tick every character that should use it.
 - **From chat** — `/roulette-bind Long-fiction blend`.
 
 Opening one of that character's chats then starts the queue and switches the
@@ -149,7 +149,7 @@ Renaming or deleting a character updates or removes its binding automatically.
 | Tab | What it is |
 |---|---|
 | **Chamber** | The live cylinder. Brass collar around glassy chambers; active chamber highlighted with a brass glow + pip ring counting down responses-remaining. Sequential clicks one notch per advance; weighted-random spins with wheel-of-fortune deceleration. Below it, an **Auto-start for _character_** picker binds the current character to a queue. |
-| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). The masks icon opens a character picker — bind many characters to one queue at once. Import / export as JSON for sharing. |
+| **Queues** | Card grid of saved queues, each with a mini-cylinder preview. Click to edit (drag-to-reorder slots, simulate 20 picks live). The characters icon opens a picker — bind many characters to one queue at once. Import / export as JSON for sharing. |
 | **History** | Every AI response logged with its profile of origin. Trail strip shows the last twelve, full list newest-first. |
 | **Settings** | Animation speed slider (0.25× to 2×), accent-colour picker (six metal presets + custom), profile-palette display. |
 
