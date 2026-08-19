@@ -212,6 +212,27 @@ export async function ensureManagedPreset(slot, queueName) {
     if (!presetMgr) return null;
 
     const desiredName = managedPresetName(slot, queueName);
+
+    // Self-heal a stale preset: the managed name embeds the queue name and
+    // profile, so renaming the queue (or re-pointing the slot) would mint a
+    // new preset and orphan the old one forever. If this slot already owns
+    // a preset under a different name, delete that one first. The stale
+    // preset may live under a different API's manager (slot re-pointed
+    // across APIs), so scan them all — gated on existence, because
+    // deletePreset on a keyed API splices by indexOf and must never be
+    // called with a name the manager doesn't list.
+    const staleName = slot.tuning.presetName;
+    if (staleName && staleName !== desiredName) {
+        for (const id of Object.keys(API_PARAM_MAP)) {
+            const mgr = getPresetManager(id);
+            if (mgr && mgr.getAllPresets().includes(staleName)) {
+                try { await mgr.deletePreset(staleName); }
+                catch (err) { console.error('[Roulette] stale managed preset cleanup failed:', err); }
+                break;
+            }
+        }
+    }
+
     const snapshot = snapshotCurrentSettings(apiId);
     if (!snapshot) return null;
     const tunedSettings = overlayParams(snapshot, slot.tuning.params, apiId);
