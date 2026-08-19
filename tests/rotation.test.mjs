@@ -20,6 +20,7 @@ import {
     decideAutoActivation,
     isCountableGeneration,
     emptyState,
+    validateQueue,
 } from '../src/rotation.js';
 
 /** Deterministic PRNG so weighted-random assertions don't flake. */
@@ -124,11 +125,42 @@ test('equal weights distribute roughly evenly', () => {
 });
 
 test('swipes, regens and continues do not consume a slot', () => {
-    for (const type of ['swipe', 'regenerate', 'continue', 'impersonate', 'quiet', 'first_message']) {
+    for (const type of ['swipe', 'regenerate', 'continue', 'append', 'appendFinal', 'impersonate', 'quiet', 'first_message']) {
         assert.equal(isCountableGeneration(type), false, `${type} should not count`);
     }
     assert.equal(isCountableGeneration(undefined), true);
+    assert.equal(isCountableGeneration(null), true);
     assert.equal(isCountableGeneration('normal'), true);
+});
+
+test('the type filter is a whitelist — unknown types fail closed', () => {
+    // 'command' (/sendas) and 'extension' (e.g. stable-diffusion) exist in
+    // today's ST; 'some-future-type' stands in for whatever comes next.
+    // None of them may consume rotation slots.
+    for (const type of ['command', 'extension', 'some-future-type', '']) {
+        assert.equal(isCountableGeneration(type), false, `"${type}" should not count`);
+    }
+});
+
+test('validateQueue rejects non-numeric count fields regardless of countMode', () => {
+    // The editor renders every count field (the inactive ones merely hidden),
+    // so a hostile value in a countMode-inactive field would reach the DOM.
+    // An imported queue must not get that far.
+    const queue = sequentialQueue();
+    queue.slots[0].countMode = 'range';
+    queue.slots[0].minCount = 1;
+    queue.slots[0].maxCount = 2;
+    queue.slots[0].fixedCount = '"><img src=x onerror=alert(1)>';
+    const errors = validateQueue(queue);
+    assert.ok(errors.some(e => e.includes('fixedCount')), `expected a fixedCount error, got: ${errors.join(' | ')}`);
+});
+
+test('validateQueue accepts absent inactive count fields', () => {
+    const queue = sequentialQueue();
+    delete queue.slots[0].minCount;
+    delete queue.slots[0].maxCount;
+    delete queue.slots[0].weight;
+    assert.deepEqual(validateQueue(queue), []);
 });
 
 /* ------------------------------------------------------------------

@@ -40,6 +40,21 @@ export function profileExists(name) {
 }
 
 /**
+ * Name of the currently-selected connection profile, or null if none is
+ * selected or it can't be resolved. ST tracks the selection as a profile
+ * *id* (extension_settings.connectionManager.selectedProfile), so this maps
+ * it back to a name for comparison against slot.profileName.
+ *
+ * @returns {string|null}
+ */
+export function currentProfileName() {
+    const cm = extension_settings?.connectionManager;
+    if (!cm?.selectedProfile || !Array.isArray(cm.profiles)) return null;
+    const profile = cm.profiles.find(p => p?.id === cm.selectedProfile);
+    return typeof profile?.name === 'string' && profile.name.length > 0 ? profile.name : null;
+}
+
+/**
  * Switch to the named connection profile. Returns true on success.
  *
  * On failure (profile missing, slash command threw, etc.) returns false; the

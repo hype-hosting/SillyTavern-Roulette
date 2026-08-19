@@ -2,7 +2,7 @@
 
 These walkthrough steps verify each acceptance criterion in a live SillyTavern. Run before tagging a release. Each section maps 1-to-1 with the acceptance criteria in `CLAUDE.md`.
 
-> **v2.0 orientation.** The extension's primary surface is the **pinned bar** — a slim row in the chat column (default: above the message input) showing one colored dot per slot, with the active slot lit and carrying its responses-remaining count. The bar's gear opens the modal (**Rotation / Queues / Settings**). The Extensions drawer holds only **Enable/Disable Roulette** (bar visibility) and **Settings** (opens the modal). Wherever an old step said "pill", read "bar".
+> **v2.0 orientation.** The extension's primary surface is the **pinned bar** — a slim row in the chat column (default: above the message input) showing one colored dot per slot, with the active slot lit and carrying its responses-remaining count. The bar's gear opens the modal (**Rotation / Queues / Settings**). The Extensions drawer holds only **Enable/Disable Roulette** (bar visibility) and **Settings** (opens the modal).
 
 ## Setup
 
@@ -10,7 +10,7 @@ These walkthrough steps verify each acceptance criterion in a live SillyTavern. 
 2. Define at least three connection profiles in **Connection Profiles** (any three providers/models — they're labels for these tests). Suggested names: `A`, `B`, `C`.
 3. Install Roulette via **Extensions → Install Extension → Install from URL** with this repository's URL.
 4. Hard-refresh the browser (`Cmd-Shift-R` / `Ctrl-Shift-R`) to bypass any stale `manifest.json` cache.
-5. Open DevTools Console. You should see the `[Roulette] ...` init log lines ending with `init() complete`. No red errors anywhere.
+5. Open DevTools Console. You should see a single `[Roulette] init() complete` log line. No red errors anywhere.
 
 If init never logs, see `CLAUDE.md` → "Robustness pattern — self-invoke from top level".
 

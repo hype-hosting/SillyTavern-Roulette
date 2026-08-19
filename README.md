@@ -1,4 +1,4 @@
-![Roulette Banner](assets/banner.png)
+![Roulette Banner](assets/banner.jpg)
 
 # SillyTavern-Roulette
 
@@ -27,7 +27,11 @@ The longer your chat runs, the more value Roulette adds. Four reasons most users
 
 ## Install
 
-In SillyTavern: **Extensions → Install Extension → Install from URL** and paste this repository's URL.
+In SillyTavern: **Extensions → Install Extension → Install from URL** and paste:
+
+```
+https://github.com/hype-hosting/SillyTavern-Roulette
+```
 
 Manual install: clone into `data/<user>/extensions/SillyTavern-Roulette/` (per-user) or `public/scripts/extensions/third-party/SillyTavern-Roulette/` (global), then enable in the Extensions panel.
 

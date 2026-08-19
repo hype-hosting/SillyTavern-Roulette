@@ -15,7 +15,14 @@
  * media query earlier than the base rule it overrides would lose.
  */
 
-.roulette-extension {
+/* Tokens are also defined on ST's .popup ancestor when it hosts one of our
+ * surfaces: the .popup:has(...) override rules further down reference these
+ * variables, and custom properties only inherit DOWNWARD — defined solely on
+ * .roulette-extension (a descendant of .popup), every var() on the popup
+ * element itself would be invalid at computed-value time and compute to
+ * `unset`, silently erasing the popup's background/border. */
+.roulette-extension,
+.popup:has(.roulette-extension) {
     /* Hex tokens — what most rules reference directly. */
     --roulette-bg:            #0c0d11;
     --roulette-surface:       #15171d;
@@ -48,7 +55,11 @@
      * 0.5 = half speed. Spring is the springy ease-out on live elements. */
     --roulette-anim-scale:    1;
     --roulette-spring:        cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
+/* Only our own surfaces get the type scale — the shared token block above
+ * also matches the ST popup element, which keeps its host font sizing. */
+.roulette-extension {
     font-size: 0.85rem;
 }
 
@@ -1535,12 +1546,21 @@
 .roulette-binding-note-missing { color: var(--roulette-stop); }
 .roulette-binding-note-conflict { color: var(--roulette-text-dim); }
 
-/* The binding picker rides inside ST's generic popup, which is themed by
- * ST — keep our canvas identity there too. */
-.popup:has(.roulette-binding-picker) {
+/* The binding picker and confirm dialog ride inside ST's generic popup,
+ * which is themed by ST — keep our canvas identity there too. (The token
+ * definitions at the top of this file also target .popup:has(...) so the
+ * var() references here resolve on the popup element itself.) */
+.popup:has(.roulette-binding-picker),
+.popup:has(.roulette-confirm) {
     background: var(--roulette-bg);
     color: var(--roulette-text);
     border: 1px solid var(--roulette-border-strong);
+}
+
+.roulette-confirm {
+    padding: 0.75rem 0.5rem;
+    color: var(--roulette-text);
+    font-size: 0.95rem;
 }
 
 /* ============================================================

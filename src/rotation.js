@@ -20,32 +20,30 @@
  *     weightedRunCount: { mode, fixed, min, max }
  *   }
  *   ChatRouletteState = {
- *     activeQueueId, currentSlotId, responsesRemaining,
+ *     activeQueueId, currentSlotId, responsesRemaining, responsesAllotted,
  *     lastSwitchMessageId, history, manuallyOverridden,
  *     autoBindHandled
  *   }
  */
 
-export const GENERATION_TYPES_TO_IGNORE = new Set([
-    'swipe',
-    'regenerate',
-    'continue',
-    'append',
-    'appendFinal',
-    'impersonate',
-    'quiet',
-    'first_message',
-]);
-
 /**
  * True iff a generation/message of this type should advance the rotation
  * counter (and trigger a profile switch on GENERATION_STARTED).
+ *
+ * Strict whitelist: only a normal user-triggered generation counts.
+ * SillyTavern passes no type for those (some paths label them 'normal').
+ * Everything else — 'swipe', 'regenerate', 'continue', 'append',
+ * 'appendFinal', 'impersonate', 'quiet', 'first_message', plus types that
+ * never reach GENERATION_STARTED at all like 'command' (/sendas) and
+ * 'extension' (extension-inserted messages), and any type SillyTavern adds
+ * in the future — must not consume rotation slots, so unknown types fail
+ * closed.
  *
  * @param {string|undefined} type generation type from MESSAGE_RECEIVED / GENERATION_STARTED
  * @returns {boolean}
  */
 export function isCountableGeneration(type) {
-    return type === undefined || type === null || type === 'normal' || !GENERATION_TYPES_TO_IGNORE.has(type);
+    return type === undefined || type === null || type === 'normal';
 }
 
 /**
@@ -277,6 +275,16 @@ export function validateQueue(queue, availableProfileNames = null) {
                 errors.push(`Slot ${i + 1} is missing a profile name.`);
             } else if (availableProfileNames && !availableProfileNames.includes(slot.profileName)) {
                 errors.push(`Slot ${i + 1}: profile "${slot.profileName}" does not exist.`);
+            }
+            // Every count field that is present must be a finite number,
+            // whichever countMode/queue mode is active. The editor renders
+            // the inactive fields too, and imported JSON can carry anything —
+            // a non-numeric value here would otherwise flow into the editor's
+            // DOM untouched.
+            for (const field of ['fixedCount', 'minCount', 'maxCount', 'weight']) {
+                if (slot[field] != null && !Number.isFinite(slot[field])) {
+                    errors.push(`Slot ${i + 1}: ${field} must be a number.`);
+                }
             }
             if (queue.mode === 'sequential') {
                 if (slot.countMode === 'fixed') {

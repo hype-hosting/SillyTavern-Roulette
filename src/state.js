@@ -231,7 +231,11 @@ export function applyUiSettings() {
         style.id = 'roulette-ui-overrides';
         document.head.appendChild(style);
     }
-    const lines = ['.roulette-extension {'];
+    // Same selector pair as the token block in style.css: the popup-chrome
+    // override rules read these variables from the .popup element itself,
+    // which is an ANCESTOR of .roulette-extension — custom properties only
+    // inherit downward, so the popup needs its own definition.
+    const lines = ['.roulette-extension, .popup:has(.roulette-extension) {'];
     if (Number.isFinite(ui.animScale) && ui.animScale > 0) {
         lines.push(`    --roulette-anim-scale: ${ui.animScale};`);
     }
@@ -266,7 +270,9 @@ function parseColor(input) {
             b: parseInt(hex.slice(4, 6), 16),
         };
     }
-    const rgbMatch = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    // Anchored to the full string on purpose: the value is interpolated into
+    // a <style> block, so a trailing "…); } evil {" must not round-trip.
+    const rgbMatch = s.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*[\d.]+\s*)?\)$/i);
     if (rgbMatch) {
         return {
             r: Number(rgbMatch[1]),

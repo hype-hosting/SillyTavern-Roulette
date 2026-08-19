@@ -14,6 +14,7 @@ import {
     SlashCommandArgument,
     ARGUMENT_TYPE,
 } from '../../../../../scripts/slash-commands/SlashCommandArgument.js';
+import { sendSystemMessage, system_message_types } from '../../../../../scripts/system-messages.js';
 import { getSettings, findQueue, getChatState } from './state.js';
 import { startRotation, stopRotation, skipCurrentSlot, reevaluateAutoActivation } from './events.js';
 import {
@@ -89,14 +90,27 @@ export function registerSlashCommands() {
         returns: 'human-readable status line',
         callback: async () => {
             const state = getChatState();
-            if (!state.activeQueueId) return 'Roulette: off';
-            const queue = findQueue(state.activeQueueId);
-            if (!queue) return 'Roulette: active queue missing';
-            const slot = queue.slots.find(s => s.id === state.currentSlotId);
-            const profile = slot?.profileName ?? '?';
-            const remaining = state.responsesRemaining;
-            const flag = state.manuallyOverridden ? ' (paused: manual override)' : '';
-            return `Roulette: ${queue.name} · ${profile} · ${remaining} left${flag}`;
+            let status;
+            if (!state.activeQueueId) {
+                status = 'Roulette: off';
+            } else {
+                const queue = findQueue(state.activeQueueId);
+                if (!queue) {
+                    status = 'Roulette: active queue missing';
+                } else {
+                    const slot = queue.slots.find(s => s.id === state.currentSlotId);
+                    const profile = slot?.profileName ?? '?';
+                    const remaining = state.responsesRemaining;
+                    const flag = state.manuallyOverridden ? ' (paused: manual override)' : '';
+                    status = `Roulette: ${queue.name} · ${profile} · ${remaining} left${flag}`;
+                }
+            }
+            // Typed bare in the chat input, a command's return value is never
+            // displayed — ST discards the pipe. Emit a system message so the
+            // user actually sees something; the return stays for piping
+            // (e.g. `/roulette-status | /echo {{pipe}}`).
+            sendSystemMessage(system_message_types.GENERIC, status);
+            return status;
         },
     }));
 

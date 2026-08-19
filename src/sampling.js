@@ -31,7 +31,6 @@ import { nai_settings } from '../../../../../scripts/nai-settings.js';
 import { textgenerationwebui_settings } from '../../../../../scripts/textgen-settings.js';
 import { getPresetManager } from '../../../../../scripts/preset-manager.js';
 import { executeSlashCommandsWithOptions, CONNECT_API_MAP } from '../../../../../scripts/slash-commands.js';
-import { isInternalSwitch } from './profileSwitcher.js';
 
 /**
  * Declarative mapping: conceptual sampler param → API-specific key on the
@@ -151,41 +150,6 @@ export function apiSupportsParam(apiId, paramId) {
 }
 
 /**
- * Build a fresh empty tuning block. Caller fills in params + flags.
- */
-export function emptyTuning() {
-    return {
-        enabled: false,
-        presetName: null,
-        params: {},
-    };
-}
-
-/**
- * Validate that a tuning block is structurally sound. Returns array of
- * error strings (empty if valid). Used by validateQueue.
- */
-export function validateTuning(tuning) {
-    if (tuning == null) return [];
-    if (typeof tuning !== 'object') return ['tuning must be an object or absent'];
-    const errs = [];
-    if (typeof tuning.enabled !== 'boolean') errs.push('tuning.enabled must be a boolean');
-    if (tuning.presetName != null && typeof tuning.presetName !== 'string') {
-        errs.push('tuning.presetName must be a string or null');
-    }
-    if (tuning.params == null || typeof tuning.params !== 'object') {
-        errs.push('tuning.params must be an object');
-    } else {
-        for (const id of TUNING_PARAM_IDS) {
-            if (tuning.params[id] != null && !Number.isFinite(tuning.params[id])) {
-                errs.push(`tuning.params.${id} must be a finite number`);
-            }
-        }
-    }
-    return errs;
-}
-
-/**
  * Stable-ish managed-preset name. Includes the queue name + profile name
  * for legibility, and a 6-char slice of the slot's UUID so reorders /
  * renames don't collide.
@@ -252,11 +216,13 @@ export async function ensureManagedPreset(slot, queueName) {
     if (!snapshot) return null;
     const tunedSettings = overlayParams(snapshot, slot.tuning.params, apiId);
 
-    // savePreset() handles both create and update by name. skipUpdate
-    // keeps it from triggering a UI refresh (we don't want to flash the
-    // preset selector during rotation).
+    // savePreset() handles both create and update by name. Do NOT pass
+    // skipUpdate: the preset must be registered in ST's in-memory list —
+    // /preset exact-matches against that list (and falls back to Fuse fuzzy
+    // matching on a miss, which could activate an unrelated preset), and
+    // cleanupManagedPresetForSlot's existence check reads the same list.
     try {
-        await presetMgr.savePreset(desiredName, tunedSettings, { skipUpdate: true });
+        await presetMgr.savePreset(desiredName, tunedSettings);
     } catch (err) {
         console.error('[Roulette] managed preset save failed:', err);
         return null;
@@ -269,9 +235,9 @@ export async function ensureManagedPreset(slot, queueName) {
 /**
  * Public entry point: called from events.js right after a successful
  * switchProfile. If the slot has tuning enabled, this ensures the managed
- * preset exists and applies it via /preset. The internal-switch flag is
- * set during the /preset call so our CONNECTION_PROFILE_LOADED listener
- * doesn't trip a manual-override.
+ * preset exists and applies it via /preset. No internal-switch flag is
+ * needed here: /preset never emits CONNECTION_PROFILE_LOADED (only the
+ * connection manager does), so this cannot trip the manual-override path.
  *
  * @param {object} slot
  * @param {object} queue
@@ -307,16 +273,22 @@ export async function cleanupManagedPresetForSlot(slot) {
     const apiId = resolveApiIdForProfile(slot.profileName);
     if (!apiId) {
         // Profile no longer resolvable — best effort: try every API's
-        // preset manager and let one pick it up.
+        // preset manager and let one pick it up. The existence check
+        // matters: deletePreset on a keyed API splices by indexOf, so
+        // calling it with an unknown name would eat an unrelated preset.
+        let deleted = false;
         for (const id of Object.keys(API_PARAM_MAP)) {
             const mgr = getPresetManager(id);
             if (mgr && mgr.getAllPresets().includes(presetName)) {
-                try { await mgr.deletePreset(presetName); } catch (_) { /* ignore */ }
+                try {
+                    await mgr.deletePreset(presetName);
+                    deleted = true;
+                } catch (_) { /* ignore */ }
                 break;
             }
         }
         slot.tuning.presetName = null;
-        return true;
+        return deleted;
     }
     const mgr = getPresetManager(apiId);
     if (!mgr) {
@@ -348,21 +320,3 @@ export async function cleanupManagedPresetsForQueue(queue) {
     }
 }
 
-/**
- * For the UI: read the current live value of a param from the API's
- * settings object. Used as the slider initial value when the user opens
- * tuning for the first time.
- */
-export function readLiveParam(apiId, paramId) {
-    const fields = fieldsForApi(apiId);
-    const spec = fields?.[paramId];
-    const live = API_PARAM_MAP[apiId]?.settingsObj?.();
-    if (!spec || !live) return null;
-    const v = live[spec.key];
-    return Number.isFinite(v) ? Number(v) : null;
-}
-
-// Quiet warning suppress: isInternalSwitch is currently imported for future
-// use (tuning may need to flag its own preset switch as internal). Keeping
-// the import to avoid churn when that lands.
-void isInternalSwitch;
