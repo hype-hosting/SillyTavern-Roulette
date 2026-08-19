@@ -2,7 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
-**Version:** 2.0.0
+**Version:** 2.0.1
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -409,7 +409,7 @@ dependencies — `node --test` is built into Node.
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
@@ -561,6 +561,12 @@ Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR
 
 ## Version log
 
+- **v2.0.1** — post-release fixes from the review + storage-lifecycle audit:
+  resume with an unresolvable profile counts as divergence; single error
+  toast on failed starts/skips; nullish count fields prefill editor defaults;
+  Rotation-tab status dot never hashes the placeholder; stale managed presets
+  self-heal on queue rename / slot re-point; regenerate criterion scoped to
+  solo chats (group regens are event-indistinguishable — known limitation).
 - **v2.0** — full UI redesign: linear dot strip + pinned bar replace the
   cylinder, widget, and pill; modal merged to three tabs; cool near-black
   palette; density pass; drawer collapsed to two buttons; settings migration
