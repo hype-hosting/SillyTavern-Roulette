@@ -50,6 +50,10 @@ let switchInFlight = null; // promise guard — only one switch at a time
  * that message still carried 'regenerate', so we remember it and consult it
  * when counting. (Assumes generations don't interleave — ST serializes the
  * main generation pipeline.)
+ *
+ * Known hole: GROUP-chat regenerates are indistinguishable at the event
+ * level — regenerateGroup() deletes the old reply and re-generates typed
+ * 'normal' end to end, so they still count. Solo chats are fully covered.
  */
 let lastGenerationType;
 
@@ -119,7 +123,7 @@ export async function startRotation(queueId) {
         // Mark this slot as failed and try to advance immediately.
         failedSlotIndices.add(pick.slotIndex);
         consecutiveFailures++;
-        const recovered = await tryAdvanceFromFailure(queue, pick.slotIndex);
+        const recovered = await tryAdvanceFromFailure(queue, pick.slotIndex, { notify: false });
         if (!recovered) {
             stopRotation();
             return { ok: false, error: `Failed to switch to "${slot.profileName}" and could not recover.` };
@@ -165,7 +169,10 @@ export function resumeRotation() {
     const queue = state.activeQueueId ? findQueue(state.activeQueueId) : null;
     const slot = queue?.slots.find(s => s.id === state.currentSlotId);
     const loadedProfile = currentProfileName();
-    const diverged = !!(slot && loadedProfile && slot.profileName !== loadedProfile);
+    // An unresolvable current profile ('<None>' selected, or the manually
+    // picked profile was deleted) is divergence too — there is no profile the
+    // slot could legitimately be "on", so the next generation must re-switch.
+    const diverged = !!(slot && slot.profileName !== loadedProfile);
     updateChatState(s => {
         s.manuallyOverridden = false;
         if (diverged) {
@@ -212,7 +219,7 @@ export async function skipCurrentSlot() {
         // try to recover
         failedSlotIndices.add(next.slotIndex);
         consecutiveFailures++;
-        const recovered = await tryAdvanceFromFailure(queue, next.slotIndex);
+        const recovered = await tryAdvanceFromFailure(queue, next.slotIndex, { notify: false });
         if (!recovered) {
             stopRotation();
             return { ok: false, error: `Skip failed and recovery exhausted.` };
@@ -230,33 +237,38 @@ export async function skipCurrentSlot() {
  * Attempt to advance past a failed slot. Recurses (bounded by
  * MAX_CONSECUTIVE_FAILURES) until a switch succeeds or we give up.
  *
+ * `notify` toasts the give-up reason. Pass false from paths whose caller
+ * already surfaces the returned error (startRotation/skipCurrentSlot) —
+ * otherwise one failed click stacks two error toasts. The mid-rotation
+ * GENERATION_STARTED path has no caller to report to, so it keeps the toast.
+ *
  * @returns {Promise<boolean>} true if recovery succeeded
  */
-async function tryAdvanceFromFailure(queue, lastFailedIndex) {
+async function tryAdvanceFromFailure(queue, lastFailedIndex, { notify = true } = {}) {
     if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         const msg = `Roulette: ${consecutiveFailures} consecutive profile-switch failures. Halting rotation.`;
         console.error(msg);
-        if (typeof toastr !== 'undefined') toastr.error(msg);
+        if (notify && typeof toastr !== 'undefined') toastr.error(msg);
         return false;
     }
     const next = advanceSlot(queue, lastFailedIndex, [...failedSlotIndices]);
     if (!next) {
         const msg = 'Roulette: no eligible slot remains. Halting rotation.';
         console.error(msg);
-        if (typeof toastr !== 'undefined') toastr.error(msg);
+        if (notify && typeof toastr !== 'undefined') toastr.error(msg);
         return false;
     }
     const slot = queue.slots[next.slotIndex];
     if (!profileExists(slot.profileName)) {
         failedSlotIndices.add(next.slotIndex);
         consecutiveFailures++;
-        return tryAdvanceFromFailure(queue, next.slotIndex);
+        return tryAdvanceFromFailure(queue, next.slotIndex, { notify });
     }
     const ok = await switchProfile(slot.profileName);
     if (!ok) {
         failedSlotIndices.add(next.slotIndex);
         consecutiveFailures++;
-        return tryAdvanceFromFailure(queue, next.slotIndex);
+        return tryAdvanceFromFailure(queue, next.slotIndex, { notify });
     }
     await applyTuningOnSwitch(slot, queue);
     updateChatState(s => {
