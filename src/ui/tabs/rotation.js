@@ -147,7 +147,9 @@ function refreshStatus(container, activeQueue, shownQueue, state, running, pause
         const slot = activeQueue.slots.find(s => s.id === state.currentSlotId);
         const profile = slot?.profileName || 'unassigned slot';
         profileEl.textContent = profile;
-        profileEl.style.setProperty('--dot-color', colorForProfile(profile) ?? 'var(--roulette-text-muted)');
+        // Hash the REAL profile name only — hashing the placeholder string
+        // would light the dot in a vivid colour that reads as a profile.
+        profileEl.style.setProperty('--dot-color', colorForProfile(slot?.profileName) ?? 'var(--roulette-text-muted)');
         profileEl.classList.remove('roulette-rot-profile-idle');
         metaEl.textContent = paused
             ? `${activeQueue.name} · paused by a manual profile switch`

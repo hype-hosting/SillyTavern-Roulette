@@ -264,6 +264,10 @@ function readWeightedRunCount(modeSel, fixed, min, max) {
 }
 
 function numOr(v, d) {
+    // Nullish/empty means "missing", not zero — Number(null) and Number('')
+    // are both 0, which would render a below-min 0 in inputs whose real
+    // default is 3/2/5/1 (e.g. a count field imported as null).
+    if (v === null || v === undefined || v === '') return d;
     const n = Number(v);
     return Number.isFinite(n) ? n : d;
 }

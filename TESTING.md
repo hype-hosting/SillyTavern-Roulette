@@ -111,12 +111,12 @@ Subjective: with rotation active and counter `> 1`, send a message; the number i
 
 In the chat input, type each command:
 
-- `/roulette-status` → echoes `Roulette: off` or `Roulette: <queue> · <profile> · N left`.
+- `/roulette-status` → posts a system message in the chat: `Roulette: off` or `Roulette: <queue> · <profile> · N left`. (A bare command's *return value* is never displayed by ST — only the system message is visible.)
 - `/roulette-start seq-test` → activates `seq-test`. The bar lights up.
 - `/roulette-skip` → forces an immediate slot advance. The lit dot moves; counter resets to the new slot's count.
 - `/roulette-stop` → deactivates. The bar returns to hollow idle dots.
-- `/roulette-bind seq-test` → binds the current character. Echoes `seq-test`.
-- `/roulette-unbind` → removes it. Echoes the queue name that was unbound.
+- `/roulette-bind seq-test` → binds the current character. No chat output of its own; with no rotation running you get the auto-start toast (`Roulette: started "seq-test" for <character>`), and the Rotation tab's Auto-start select now shows `seq-test`.
+- `/roulette-unbind` → removes the binding. No chat output; verify via the Rotation tab's Auto-start select reading `Nothing`.
 
 **Pass:** All six commands behave as described, with no console errors.
 
