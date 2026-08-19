@@ -15,6 +15,7 @@ import { openBindingPicker } from '../bindingPicker.js';
 import { mountDotStrip } from '../dotStrip.js';
 import { exportQueue, exportAllQueues, importQueueFile } from '../../exportImport.js';
 import { renderEditorInto } from '../queueEditor.js';
+import { confirmDialog } from '../confirm.js';
 import { cleanupManagedPresetsForQueue } from '../../sampling.js';
 
 const tabState = new WeakMap();
@@ -173,7 +174,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
         <div class="roulette-queue-card-name" title="${escapeHtml(queue.name)}">${escapeHtml(queue.name)}</div>
         <div class="roulette-queue-card-tags">
             <span class="roulette-tag roulette-tag-mode">${queue.mode}</span>
-            <span class="roulette-tag">${queue.slots?.length ?? 0} chambers</span>
+            <span class="roulette-tag">${queue.slots?.length ?? 0} slot${(queue.slots?.length ?? 0) === 1 ? '' : 's'}</span>
             ${hasTuning ? '<span class="roulette-tag roulette-tag-tuned" title="Has inline sampler tuning"><i class="fa-solid fa-sliders"></i> tuned</span>' : ''}
             ${boundCount ? `<span class="roulette-tag roulette-tag-bound" title="Auto-starts for ${boundCount} character(s)"><i class="fa-solid fa-users"></i> ${boundCount}</span>` : ''}
             ${isActive ? '<span class="roulette-tag roulette-tag-active">active</span>' : ''}
@@ -219,7 +220,10 @@ function buildQueueCard(queue, isActive, tabContainer) {
     actions.addEventListener('click', (e) => e.stopPropagation());
 
     actions.querySelector('[data-card-act="start"]')?.addEventListener('click', async () => {
-        await startRotation(queue.id);
+        const result = await startRotation(queue.id);
+        if (!result.ok && typeof toastr !== 'undefined') {
+            toastr.error(`Could not start rotation: ${result.error}`);
+        }
         populateGrid(tabContainer);
     });
     actions.querySelector('[data-card-act="stop"]')?.addEventListener('click', () => {
@@ -242,7 +246,15 @@ function buildQueueCard(queue, isActive, tabContainer) {
         dup.id = uuid();
         dup.name = `${queue.name} (copy)`;
         if (Array.isArray(dup.slots)) {
-            dup.slots = dup.slots.map(s => ({ ...s, id: uuid() }));
+            // Fresh slot ids AND a cleared tuning.presetName: the cloned
+            // pointer still names the ORIGINAL queue's managed preset, so
+            // deleting the duplicate before its first tuned switch would
+            // delete the original's preset out from under it.
+            dup.slots = dup.slots.map(s => ({
+                ...s,
+                id: uuid(),
+                tuning: s.tuning ? { ...s.tuning, presetName: null } : s.tuning,
+            }));
         }
         upsertQueue(dup);
         populateGrid(tabContainer);
@@ -252,7 +264,7 @@ function buildQueueCard(queue, isActive, tabContainer) {
         exportQueue(queue);
     });
     actions.querySelector('[data-card-act="delete"]').addEventListener('click', async () => {
-        if (!confirm(`Delete queue "${queue.name}"?`)) return;
+        if (!(await confirmDialog(`Delete queue "${queue.name}"?`, { okButton: 'Delete' }))) return;
         // Clean up any sampler presets Roulette manages for this queue's
         // slots before forgetting the queue. Best-effort — failures here
         // log but don't block deletion.

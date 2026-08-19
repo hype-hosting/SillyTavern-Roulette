@@ -16,38 +16,25 @@
 import { registerEventListeners } from './src/events.js';
 import { registerSlashCommands } from './src/slashCommands.js';
 import { mountSettingsPanel } from './src/ui/settingsPanel.js';
-import { openRouletteModal } from './src/ui/modal.js';
 import { mountBar } from './src/ui/bar.js';
 import { getSettings, applyUiSettings } from './src/state.js';
 
 const EXT_NAME = 'Roulette';
 
-console.log(`[${EXT_NAME}] module loaded`);
-
 let initialized = false;
 
 export async function init() {
-    if (initialized) {
-        console.log(`[${EXT_NAME}] init() called again — already initialized, skipping`);
-        return;
-    }
+    // Both the manifest hook and the self-invoke below call init(); the
+    // second call is a silent no-op.
+    if (initialized) return;
     initialized = true;
-    console.log(`[${EXT_NAME}] init() called`);
     try {
         getSettings();
         applyUiSettings();
         registerEventListeners();
-        console.log(`[${EXT_NAME}] event listeners registered`);
         registerSlashCommands();
-        console.log(`[${EXT_NAME}] slash commands registered`);
         mountSettingsPanel();
-        console.log(`[${EXT_NAME}] settings panel mounted`);
         mountBar();
-        console.log(`[${EXT_NAME}] pinned bar mounted (if enabled)`);
-        // Debug helper: window.__roulette.openModal() pops the modal.
-        // Removed before v1.0 release; useful during the build-out of
-        // each tab.
-        globalThis.__roulette = { openModal: openRouletteModal };
         console.log(`[${EXT_NAME}] init() complete`);
     } catch (err) {
         initialized = false; // allow retry

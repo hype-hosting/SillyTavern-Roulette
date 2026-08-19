@@ -18,10 +18,9 @@ import {
     advanceSlot,
     indexOfSlot,
     appendHistory,
-    rollSlotResponses,
     decideAutoActivation,
 } from './rotation.js';
-import { switchProfile, isInternalSwitch, profileExists } from './profileSwitcher.js';
+import { switchProfile, isInternalSwitch, profileExists, currentProfileName } from './profileSwitcher.js';
 import { applyTuningOnSwitch } from './sampling.js';
 import {
     getCurrentCharacter,
@@ -40,6 +39,19 @@ let failedSlotIndices = new Set(); // indices of slots that failed in the curren
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 let switchInFlight = null; // promise guard — only one switch at a time
+
+/**
+ * Generation type of the most recent (non-dry) GENERATION_STARTED.
+ *
+ * Needed because ST's MESSAGE_RECEIVED type can lie: a non-streaming
+ * regenerate deletes the AI message being redone *before* generating, so by
+ * the time saveReply emits MESSAGE_RECEIVED the last message is the user's
+ * and the type is coerced to 'normal'. The GENERATION_STARTED that produced
+ * that message still carried 'regenerate', so we remember it and consult it
+ * when counting. (Assumes generations don't interleave — ST serializes the
+ * main generation pipeline.)
+ */
+let lastGenerationType;
 
 /** Subscribers notified on any rotation-state change (used by the UI). */
 const stateChangeListeners = new Set();
@@ -141,10 +153,24 @@ export function stopRotation() {
 
 /**
  * Resume rotation after a manual override.
+ *
+ * Spec (CLAUDE.md §5): if the profile the user is sitting on matches the
+ * current slot, just continue. Otherwise the responses generated while
+ * paused belong to a foreign profile — zero the counter so the next
+ * generation starts a fresh rotation cycle (advance/re-pick + switch)
+ * instead of counting them against the slot.
  */
 export function resumeRotation() {
-    updateChatState(state => {
-        state.manuallyOverridden = false;
+    const state = getChatState();
+    const queue = state.activeQueueId ? findQueue(state.activeQueueId) : null;
+    const slot = queue?.slots.find(s => s.id === state.currentSlotId);
+    const loadedProfile = currentProfileName();
+    const diverged = !!(slot && loadedProfile && slot.profileName !== loadedProfile);
+    updateChatState(s => {
+        s.manuallyOverridden = false;
+        if (diverged) {
+            s.responsesRemaining = 0;
+        }
     });
     consecutiveFailures = 0;
     failedSlotIndices.clear();
@@ -192,6 +218,8 @@ export async function skipCurrentSlot() {
             return { ok: false, error: `Skip failed and recovery exhausted.` };
         }
     } else {
+        consecutiveFailures = 0;
+        failedSlotIndices.clear();
         await applyTuningOnSwitch(slot, queue);
     }
     notifyStateChanged();
@@ -249,6 +277,11 @@ async function tryAdvanceFromFailure(queue, lastFailedIndex) {
  */
 async function onMessageReceived(messageId, type) {
     if (!isCountableGeneration(type)) return;
+    // The emitted type can be coerced to 'normal' (see lastGenerationType);
+    // trust the type the generation actually started with. Messages that
+    // never fire GENERATION_STARTED ('command', 'extension', 'first_message')
+    // are already rejected by their own type above.
+    if (!isCountableGeneration(lastGenerationType)) return;
     const state = getChatState();
     if (!state.activeQueueId || state.manuallyOverridden) return;
     const queue = findQueue(state.activeQueueId);
@@ -281,6 +314,7 @@ async function onMessageReceived(messageId, type) {
  */
 async function onGenerationStarted(type, _options, dryRun) {
     if (dryRun) return;
+    lastGenerationType = type;
     if (!isCountableGeneration(type)) return;
     const state = getChatState();
     if (!state.activeQueueId || state.manuallyOverridden) return;
@@ -318,8 +352,16 @@ async function onGenerationStarted(type, _options, dryRun) {
         if (!ok) {
             failedSlotIndices.add(next.slotIndex);
             consecutiveFailures++;
-            await tryAdvanceFromFailure(queue, next.slotIndex);
+            const recovered = await tryAdvanceFromFailure(queue, next.slotIndex);
+            if (!recovered) {
+                // Recovery exhausted (3 consecutive failures, or no eligible
+                // slot left): actually halt, per spec — otherwise the bar
+                // keeps showing a "running" rotation whose switches all fail.
+                stopRotation();
+            }
         } else {
+            consecutiveFailures = 0;
+            failedSlotIndices.clear();
             await applyTuningOnSwitch(slot, queue);
         }
         notifyStateChanged();
@@ -419,6 +461,7 @@ export async function reevaluateAutoActivation() {
 async function onChatChanged(_chatId) {
     consecutiveFailures = 0;
     failedSlotIndices.clear();
+    lastGenerationType = undefined;
     notifyStateChanged();
     await maybeAutoActivateForCharacter();
 }
@@ -492,23 +535,4 @@ export function registerEventListeners() {
         maybeAutoActivateForCharacter().catch(err =>
             console.error('[Roulette] APP_READY auto-activate failed:', err));
     });
-}
-
-/**
- * Re-roll the responses-remaining counter from the current slot's config.
- * Used when activating a queue if state is corrupt or after manual overrides.
- */
-export function rerollCurrentSlotCounter() {
-    const state = getChatState();
-    if (!state.activeQueueId) return;
-    const queue = findQueue(state.activeQueueId);
-    if (!queue) return;
-    const slot = queue.slots.find(s => s.id === state.currentSlotId);
-    if (!slot) return;
-    const responses = rollSlotResponses(slot, queue);
-    updateChatState(s => {
-        s.responsesRemaining = responses;
-        s.responsesAllotted = responses;
-    });
-    notifyStateChanged();
 }

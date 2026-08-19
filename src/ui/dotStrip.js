@@ -44,13 +44,14 @@ const MAX_COUNT = 99;
  * @returns {HTMLElement} the strip element
  */
 export function mountDotStrip(host, opts) {
-    const key = stripKey(opts);
+    const win = windowFor(opts.slots ?? [], opts);
+    const key = stripKey(opts, win);
     const existing = host.firstElementChild;
     if (existing && existing.dataset.stripKey === key) {
         patchStrip(existing, opts);
         return existing;
     }
-    const el = buildStrip(opts);
+    const el = buildStrip(opts, win, key);
     host.replaceChildren(el);
     return el;
 }
@@ -58,14 +59,19 @@ export function mountDotStrip(host, opts) {
 /**
  * Fingerprint of everything that changes the strip's structure. Deliberately
  * excludes activeSlotId, responsesRemaining, paused and idle — those are
- * exactly the things patchStrip() can apply without a rebuild.
+ * exactly the things patchStrip() can apply without a rebuild. The rendered
+ * window IS part of the fingerprint: on queues longer than the variant's cap
+ * the window follows the active slot, and a strip patched against a stale
+ * window would simply lose its active capsule once rotation walked past the
+ * edge. A window shift means dots enter and leave, so that rebuild is
+ * unavoidable anyway.
  */
-function stripKey(opts) {
+function stripKey(opts, win) {
     const { slots = [], mode = 'sequential', variant = 'bar' } = opts;
     const shape = slots
         .map(s => `${s.id}:${s.profileName ?? ''}:${mode === 'weighted-random' ? (s.weight ?? 1) : ''}`)
         .join('|');
-    return `${variant}/${mode}/${shape}`;
+    return `${variant}/${mode}/${shape}@${win.from}-${win.to}`;
 }
 
 /**
@@ -80,7 +86,7 @@ function stripKey(opts) {
  * @param {boolean} opts.idle                no rotation running — dots render hollow
  * @returns {HTMLElement}
  */
-function buildStrip(opts) {
+function buildStrip(opts, win, key) {
     const {
         slots = [],
         mode = 'sequential',
@@ -89,7 +95,7 @@ function buildStrip(opts) {
 
     const strip = document.createElement('div');
     strip.className = `roulette-dots roulette-dots-${variant}`;
-    strip.dataset.stripKey = stripKey(opts);
+    strip.dataset.stripKey = key;
     strip.setAttribute('role', 'img');
 
     if (slots.length === 0) {
@@ -109,7 +115,7 @@ function buildStrip(opts) {
         ? buildWeightScaler(slots)
         : () => 1;
 
-    const { from, to, cutStart, cutEnd } = windowFor(slots, opts);
+    const { from, to, cutStart, cutEnd } = win;
 
     if (cutStart) strip.appendChild(buildEllipsis(from));
     for (let i = from; i < to; i++) {
@@ -247,7 +253,13 @@ function flash(dot) {
     // two switches land back to back.
     void dot.offsetWidth;
     dot.classList.add('roulette-dot-igniting');
-    setTimeout(() => dot.classList.remove('roulette-dot-igniting'), 700);
+    // Remove on the animation's own completion — its duration is divided by
+    // the user's animation-speed setting, so a wall-clock timeout would cut
+    // the flare short at slow speeds. A lingering class is inert (the
+    // animation is one-shot), so no fallback timer is needed.
+    dot.addEventListener('animationend',
+        () => dot.classList.remove('roulette-dot-igniting'),
+        { once: true });
 }
 
 /**

@@ -125,6 +125,7 @@ function attach() {
 
     let anchor = null;
     let mode = 'before';
+    let actualPosition = position;
     if (position === 'above-chat' && chat?.parentElement) {
         anchor = chat;
     } else if (position === 'below-input' && form?.parentElement) {
@@ -132,9 +133,11 @@ function attach() {
         mode = 'after';
     } else if (form?.parentElement) {
         anchor = form; // 'above-input', and the fallback for everything else
+        actualPosition = 'above-input';
     } else if (chat?.parentElement) {
         anchor = chat;
         mode = 'after';
+        actualPosition = 'below-chat';
     }
 
     if (!anchor) {
@@ -144,7 +147,10 @@ function attach() {
     if (mode === 'after') anchor.after(barEl);
     else anchor.before(barEl);
 
-    barEl.dataset.barPosition = position;
+    // Record where the bar actually landed, which can differ from the
+    // configured position when an anchor was missing — position-keyed CSS
+    // should style the real spot, not the wish.
+    barEl.dataset.barPosition = actualPosition;
     return true;
 }
 
@@ -271,7 +277,11 @@ function renderLabel(activeQueue, shownQueue, state, paused) {
         profileEl.title = paused
             ? `Paused by a manual profile switch — ${activeQueue.name} is still loaded`
             : `${profile} · ${activeQueue.name}`;
-        profileEl.style.setProperty('--dot-color', colorForProfile(profile) ?? 'var(--roulette-text-muted)');
+        // Hash the REAL profile name only: hashing the 'unassigned'
+        // placeholder would light the label dot in a vivid palette colour
+        // that looks like a legitimate profile.
+        profileEl.style.setProperty('--dot-color',
+            colorForProfile(slot?.profileName) ?? 'var(--roulette-text-muted)');
         return;
     }
 

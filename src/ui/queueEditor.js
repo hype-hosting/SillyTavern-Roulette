@@ -1,23 +1,19 @@
 /* SillyTavern-Roulette — AGPL-3.0
  *
- * Queue editor. Shared form-building lives in buildEditorElement(); two
- * presentation paths consume it:
+ * Queue editor. Shared form-building lives in buildEditorElement();
+ * renderEditorInto(container, initialQueue, callbacks) embeds the form into
+ * a container — the modal's Queues tab uses it so editing replaces the card
+ * grid instead of stacking a popup.
  *
- *   - openQueueEditor(initialQueue) — ST Popup-class popup. Used by the
- *     legacy drawer settings panel until step 10 trims it. Will also be
- *     useful as a small confirm-style editor in future contexts.
- *   - renderEditorInto(container, initialQueue, callbacks) — embeds the
- *     form into a container. Used by the modal's Queues tab (step 7) so
- *     editing replaces the right pane instead of stacking a popup.
- *
- * Shared:
+ * Behaviour:
  *   - drag-and-drop slot reorder
- *   - live-bound field changes write through to the queue object on input
+ *   - live-bound field changes write through to a structuredClone of the
+ *     queue; nothing touches stored state (or ST presets) until Save
  *   - simulate-20-picks button (preview without saving)
- *   - validateQueue + upsertQueue on Save
+ *   - validateQueue + upsertQueue on Save; managed-preset cleanup for
+ *     removed slots also runs only at Save, so Cancel is side-effect-free
  */
 
-import { Popup, POPUP_TYPE, POPUP_RESULT } from '../../../../../../scripts/popup.js';
 import { listProfileNames } from '../profileSwitcher.js';
 import { upsertQueue } from '../state.js';
 import { validateQueue, pickInitialSlot, advanceSlot } from '../rotation.js';
@@ -65,14 +61,18 @@ function defaultQueue() {
  * (popup, embedded pane, etc.) and provides the Save action.
  *
  * @param {object|null} initialQueue
- * @returns {{element: HTMLElement, queue: object, finalize: () => string[]}}
+ * @returns {{element: HTMLElement, queue: object, finalize: () => string[], removedSlots: object[]}}
  *   `finalize` reads the name input + validates and returns errors (empty
  *   if all good). It also normalises the queue.name in place.
+ *   `removedSlots` collects slots the user deleted; the Save path cleans up
+ *   their managed presets (doing it at remove-click time would leak a real
+ *   ST-side deletion out of an editor session the user may still Cancel).
  */
 export function buildEditorElement(initialQueue = null) {
     const queue = initialQueue
         ? structuredClone(initialQueue)
         : defaultQueue();
+    const removedSlots = [];
 
     const root = document.createElement('div');
     root.className = 'roulette-extension roulette-queue-editor';
@@ -121,7 +121,7 @@ export function buildEditorElement(initialQueue = null) {
     function renderSlots() {
         slotsContainer.innerHTML = '';
         queue.slots.forEach((slot, i) => {
-            slotsContainer.appendChild(slotRow(slot, i, queue.mode, queue, renderSlots));
+            slotsContainer.appendChild(slotRow(slot, i, queue.mode, queue, renderSlots, s => removedSlots.push(s)));
         });
         setupDragAndDrop();
     }
@@ -189,41 +189,7 @@ export function buildEditorElement(initialQueue = null) {
         return validateQueue(queue);
     }
 
-    return { element: root, queue, finalize };
-}
-
-/**
- * Open the editor as a popup (legacy path). Saves on AFFIRMATIVE result.
- *
- * @param {object|null} initialQueue
- * @returns {Promise<{saved: boolean, queue: object|null}>}
- */
-export async function openQueueEditor(initialQueue = null) {
-    const { element, queue, finalize } = buildEditorElement(initialQueue);
-
-    const popup = new Popup(element, POPUP_TYPE.CONFIRM, '', {
-        okButton: 'Save',
-        cancelButton: 'Cancel',
-        wide: true,
-        large: true,
-        allowVerticalScrolling: true,
-    });
-
-    const result = await popup.show();
-    if (result !== POPUP_RESULT.AFFIRMATIVE) {
-        return { saved: false, queue: null };
-    }
-
-    const errors = finalize();
-    if (errors.length) {
-        if (typeof toastr !== 'undefined') {
-            toastr.error('Cannot save queue:\n' + errors.join('\n'));
-        }
-        return { saved: false, queue: null };
-    }
-
-    upsertQueue(queue);
-    return { saved: true, queue };
+    return { element: root, queue, finalize, removedSlots };
 }
 
 /**
@@ -240,7 +206,7 @@ export async function openQueueEditor(initialQueue = null) {
  * @returns {() => void} dispose
  */
 export function renderEditorInto(container, initialQueue, { onSave, onCancel } = {}) {
-    const { element, queue, finalize } = buildEditorElement(initialQueue);
+    const { element, queue, finalize, removedSlots } = buildEditorElement(initialQueue);
     container.innerHTML = '';
 
     // Header bar with Cancel/Save lives ABOVE the form so it's always
@@ -274,6 +240,12 @@ export function renderEditorInto(container, initialQueue, { onSave, onCancel } =
             return;
         }
         upsertQueue(queue);
+        // Only now that the removals are committed do we delete the removed
+        // slots' managed sampler presets — a Cancel must leave ST untouched.
+        for (const removed of removedSlots) {
+            cleanupManagedPresetForSlot(removed).catch(err =>
+                console.error('[Roulette] preset cleanup for removed slot failed:', err));
+        }
         onSave?.(queue);
     });
 
@@ -296,7 +268,20 @@ function numOr(v, d) {
     return Number.isFinite(n) ? n : d;
 }
 
-function slotRow(slot, index, mode, queue, rerender) {
+/**
+ * Guard form controls inside a draggable row: without this, pressing down
+ * on a slider/select/input starts a row drag instead of operating the
+ * control (worst in Firefox). Must be re-applied after any innerHTML that
+ * injects new controls into the row (e.g. the tuning panel).
+ */
+function applyInputDragGuards(el) {
+    el.querySelectorAll('select, input').forEach(inp => {
+        inp.addEventListener('mousedown', e => e.stopPropagation());
+        inp.draggable = false;
+    });
+}
+
+function slotRow(slot, index, mode, queue, rerender, onRemove) {
     const row = document.createElement('div');
     row.className = 'roulette-slot-row';
     row.draggable = true;
@@ -317,13 +302,13 @@ function slotRow(slot, index, mode, queue, rerender) {
                    <option value="fixed"${slot.countMode === 'fixed' ? ' selected' : ''}>Fixed</option>
                    <option value="range"${slot.countMode === 'range' ? ' selected' : ''}>Range</option>
                </select>
-               <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="fixedCount" min="1" value="${slot.fixedCount ?? 3}" title="Fixed response count" />
+               <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="fixedCount" min="1" value="${numOr(slot.fixedCount, 3)}" title="Fixed response count" />
                <span class="roulette-range-fields ${slot.countMode === 'range' ? '' : 'hidden'}">
-                   <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="minCount" min="1" value="${slot.minCount ?? 2}" title="Min" />
+                   <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="minCount" min="1" value="${numOr(slot.minCount, 2)}" title="Min" />
                    <span>–</span>
-                   <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="maxCount" min="1" value="${slot.maxCount ?? 5}" title="Max" />
+                   <input type="number" class="text_pole roulette-slot-narrow" data-slot-field="maxCount" min="1" value="${numOr(slot.maxCount, 5)}" title="Max" />
                </span>`
-            : `<input type="number" class="text_pole roulette-slot-narrow" data-slot-field="weight" min="0" step="0.1" value="${slot.weight ?? 1}" title="Weight" />`
+            : `<input type="number" class="text_pole roulette-slot-narrow" data-slot-field="weight" min="0" step="0.1" value="${numOr(slot.weight, 1)}" title="Weight" />`
         }
         <div class="roulette-slot-actions">
             <i class="menu_button fa-solid fa-sliders ${tuningEnabled ? 'roulette-slot-tune-active' : ''}" data-action="toggle-tuning" title="Tune sampler params for this slot"></i>
@@ -332,15 +317,17 @@ function slotRow(slot, index, mode, queue, rerender) {
         <div class="roulette-slot-tuning ${tuningOpenInitial ? '' : 'hidden'}" data-field="tuning"></div>
     `;
 
-    row.querySelectorAll('select, input').forEach(el => {
-        el.addEventListener('mousedown', e => e.stopPropagation());
-        el.draggable = false;
-    });
+    applyInputDragGuards(row);
 
-    row.querySelector('[data-action="remove"]').addEventListener('click', async () => {
-        // Clean up the managed sampler preset before forgetting the slot.
-        await cleanupManagedPresetForSlot(slot);
-        queue.slots.splice(index, 1);
+    row.querySelector('[data-action="remove"]').addEventListener('click', () => {
+        // Splice by identity, not the render-time index — a prior removal
+        // may have shifted positions. Preset cleanup is deferred to Save
+        // (see buildEditorElement) so Cancel stays side-effect-free.
+        const i = queue.slots.indexOf(slot);
+        if (i >= 0) {
+            queue.slots.splice(i, 1);
+            onRemove?.(slot);
+        }
         if (queue.slots.length === 0) queue.slots.push(defaultSlot());
         rerender();
     });
@@ -434,12 +421,12 @@ function renderTuningPanel(panelEl, slot) {
                                class="roulette-range roulette-tuning-slider"
                                data-tuning-field="${id}"
                                min="${spec.min}" max="${spec.max}" step="${spec.step}"
-                               value="${value}" />
+                               value="${numOr(value, (spec.min + spec.max) / 2)}" />
                         <input type="number"
                                class="text_pole roulette-tuning-number"
                                data-tuning-field-num="${id}"
                                min="${spec.min}" max="${spec.max}" step="${spec.step}"
-                               value="${current != null ? current : ''}"
+                               value="${current != null ? numOr(current, '') : ''}"
                                placeholder="default" />
                         <button type="button" class="roulette-tuning-clear" data-tuning-clear="${id}" title="Use profile default">
                             <i class="fa-solid fa-rotate-left"></i>
@@ -449,6 +436,11 @@ function renderTuningPanel(panelEl, slot) {
             }).join('')}
         </div>
     `;
+
+    // The panel lives inside a draggable slot row and its controls were
+    // injected after the row's own guard pass — re-guard them here (this
+    // runs again on profile change, covering re-renders too).
+    applyInputDragGuards(panelEl);
 
     const enabledInput = panelEl.querySelector('[data-tuning-field="enabled"]');
     enabledInput.addEventListener('change', () => {

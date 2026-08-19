@@ -50,18 +50,18 @@ The extension is a thin scheduler layered on top of SillyTavern's existing Conne
 ### Hook points (SillyTavern event system)
 Use `eventSource.on(event_types.X, handler)` for all of these. Import `eventSource` and `event_types` from `../../../../script.js` (verified — see "Verified ST internals" below).
 
-- `MESSAGE_RECEIVED` — primary trigger for advancing the response counter. **Emitted with `(messageId, type)`** where `type` is one of `'swipe'`, `'continue'`, `'append'`, `'appendFinal'`, `'regenerate'`, `'impersonate'`, `'quiet'`, `'first_message'`, or `undefined` for a normal generation. **Advance the counter only when `type` is undefined/normal.** Filtering on `type` is what makes swipes, regens, continues, and impersonations not consume rotation slots — there is no other event-level guard.
+- `MESSAGE_RECEIVED` — primary trigger for advancing the response counter. **Emitted with `(messageId, type)`** where `type` is one of `'swipe'`, `'continue'`, `'append'`, `'appendFinal'`, `'regenerate'`, `'impersonate'`, `'quiet'`, `'first_message'`, `'command'` (/sendas-inserted character messages), `'extension'` (extension-inserted messages, e.g. stable-diffusion), `'normal'`, or `undefined` for a normal generation. **Advance the counter only when `type` is undefined/null/`'normal'`** — `isCountableGeneration()` is a strict whitelist so unknown future types fail closed. One trap the emitted type alone cannot catch: a **non-streaming regenerate** deletes the AI message being redone *before* generating, so by the time `saveReply` emits `MESSAGE_RECEIVED` the preceding message is the user's and the type is **coerced to `'normal'`** (streaming regens emit `'regenerate'` faithfully). `events.js` therefore also records the type each non-dry `GENERATION_STARTED` carried (`lastGenerationType`) and refuses to count a message whose *generation* started non-countable.
 - `GENERATION_STARTED` — emitted with `(type, options, dryRun)`. The moment to fire the profile switch *before* the next generation, if the rotation says it's time to switch. **Skip when `dryRun === true`** (ST emits this for prompt-token-counting and similar dry runs) and skip non-normal `type` values (same set as above). This is critical: we switch profiles *before* the model generates, not after.
 - `MESSAGE_SWIPED` — fires when the user navigates between **existing** swipes via the left/right arrows; not on swipe-regeneration. Largely irrelevant to the scheduler since the `type` filter on `MESSAGE_RECEIVED`/`GENERATION_STARTED` already handles regen-swipes.
 - `CHAT_CHANGED` — emitted as `'chat_id_changed'`. Reload per-chat rotation state when the user switches chats.
-- `CONNECTION_PROFILE_LOADED` — fires for **both** manual user switches *and* our own programmatic `/profile` calls (verified: see "Verified ST internals"). The handler must consult an internal `isInternalSwitch` flag we set immediately before firing `/profile` and clear inside the handler — otherwise we trip our own manual-override path on every rotation.
+- `CONNECTION_PROFILE_LOADED` — fires for **both** manual user switches *and* our own programmatic `/profile` calls (verified: see "Verified ST internals"). Payload is the profile **name** string (or `'<None>'`). The handler must consult an internal `isInternalSwitch` flag we set immediately before firing `/profile` — otherwise we trip our own manual-override path on every rotation. The flag is cleared by a `queueMicrotask` in `switchProfile`'s `finally` (not by the handler itself): the microtask defer means every synchronous listener that fires while the slash command resolves still sees the flag set, however many there are.
 - `CHARACTER_DELETED` — emitted with `({ id, character })`. Purge that character's queue binding.
 - `CHARACTER_RENAMED` — emitted with `(oldAvatar, newAvatar)`. Avatar filenames track the character name, so a rename moves our binding key; re-point it or the binding is silently orphaned.
 - `APP_READY` — boot-time safety net for character-binding auto-start. `eventSource` is constructed with `autoFireAfterEmit` covering `APP_READY`, so a listener registered *after* the event already fired is invoked immediately with the last args. ST inits extensions before loading the first chat, so `CHAT_CHANGED` normally covers startup on its own; this is belt-and-braces for late-loading installs.
 
 **Generation type strings** (for the filter logic in `rotation.js`):
-- Advance counter / fire switch: `undefined` (normal user generation).
-- Ignore: `'swipe'`, `'regenerate'`, `'continue'`, `'append'`, `'appendFinal'`, `'impersonate'`, `'quiet'`, `'first_message'`, plus any `dryRun === true`.
+- Advance counter / fire switch: `undefined`, `null`, or `'normal'` (normal user generation). This is a **whitelist** — everything else is ignored, so a type ST adds tomorrow can never silently consume rotation slots.
+- Known ignored types: `'swipe'`, `'regenerate'`, `'continue'`, `'append'`, `'appendFinal'`, `'impersonate'`, `'quiet'`, `'first_message'`, `'command'`, `'extension'`, plus any `dryRun === true` and any message whose `GENERATION_STARTED` type was non-countable (the coerced-regenerate guard above).
 
 ### Profile switching mechanism
 Use SillyTavern's slash command system to switch profiles. The `/profile` command is registered by the built-in Connection Profiles extension and accepts an `await=true` named arg that resolves only after `CONNECTION_PROFILE_LOADED` and an online-status check — use it so the switch is synchronous from our perspective:
@@ -132,13 +132,15 @@ type ChatRouletteState = {
   activeQueueId: string | null;       // which queue is running, null = rotation off
   currentSlotId: string | null;       // the slot currently in effect
   responsesRemaining: number;         // counter that decrements per accepted response
+  responsesAllotted: number;          // what the counter started at — the UI renders "N of M"
   lastSwitchMessageId: number | null; // message index where we last switched, for diagnostics
   history: Array<{                    // optional log: which profile generated which message
-    messageId: number;
+    messageId: number;                // capped at 500 entries (appendHistory)
     profileName: string;
     timestamp: number;
   }>;
   manuallyOverridden: boolean;        // see "Manual override behavior"
+  autoBindHandled: boolean;           // see "Per-character queue bindings" — the auto-start latch
 };
 ```
 
@@ -166,7 +168,7 @@ On `MESSAGE_SWIPED`: do nothing. Swipes are same-slot retries by design.
 
 If the user manually switches connection profiles via the existing ST UI (detected via `CONNECTION_PROFILE_LOADED` for a profile that doesn't match `currentSlotId`'s profile), set `manuallyOverridden = true`. The status indicator changes to "Rotation paused (manual override)" with a "Resume" button. Clicking Resume:
 - If on the same profile a slot points to, set `manuallyOverridden = false` and continue from the current state.
-- Otherwise, set `manuallyOverridden = false`, treat the next response as the start of a new rotation cycle (re-pick or advance).
+- Otherwise, set `manuallyOverridden = false`, treat the next response as the start of a new rotation cycle (re-pick or advance). Implemented in `resumeRotation()` by zeroing `responsesRemaining`: the existing `GENERATION_STARTED` path then advances/re-picks and switches before the next generation, and the pick history never attributes foreign-profile responses to the slot.
 
 ### 6. Error handling
 
@@ -344,6 +346,8 @@ colour), per-slot sampler tuning (`src/sampling.js`), per-character bindings
 SillyTavern-Roulette/
 ├── manifest.json              # ST extension manifest
 ├── package.json               # node-only: `npm test`, type:module. ST ignores it.
+├── assets/
+│   └── banner.jpg             # README hero image (keep it small — every install clones it)
 ├── index.js                   # entry point: init() wires every subsystem
 ├── style.css                  # scoped styles + --roulette-* token set
 ├── README.md                  # user-facing docs (value, install, recipes)
@@ -366,6 +370,7 @@ SillyTavern-Roulette/
 │       ├── profileColors.js   # hash-based stable profile colour assignment
 │       ├── queueEditor.js     # form builder shared by popup + embedded paths
 │       ├── settingsPanel.js   # drawer block: Enable/Disable Roulette + Settings
+│       ├── confirm.js         # themed yes/no dialog (replaces native confirm())
 │       ├── templates.html     # reserved for future fragments (currently empty)
 │       └── tabs/
 │           ├── rotation.js    # dot-strip hero + status + actions + binding + pick history
@@ -444,7 +449,7 @@ The `../../../../` depth in the table above is for **`index.js` at the extension
 ### Connection profile enumeration
 ST stores connection profiles in `extension_settings.connectionManager.profiles` (verified — `public/scripts/extensions.js:172`). Each profile is a `ConnectionProfile` with at least `id` and `name` (full JSDoc at `public/scripts/extensions/connection-manager/index.js:159`). The currently selected profile is tracked as an **id** at `extension_settings.connectionManager.selectedProfile`, *not* a name — convert when comparing.
 
-The queue editor's profile dropdown should read from this list directly and refresh on `CONNECTION_PROFILE_LOADED`, `CONNECTION_PROFILE_CREATED`, `CONNECTION_PROFILE_DELETED`, `CONNECTION_PROFILE_UPDATED`, and on modal open. **Do not cache** the profile list — the user may add/remove profiles between sessions.
+The queue editor's profile dropdown reads from this list directly, re-read at every slot-row render, and the modal remounts its tabs fresh on every open. **Do not cache** the profile list — the user may add/remove profiles between sessions. (No `CONNECTION_PROFILE_*` event subscription is needed for the editor: the modal is a native `<dialog>` shown with `showModal()`, which makes the rest of ST inert — the user cannot reach the connection manager to mutate profiles while the editor is open.)
 
 ### Modals — use ST's `Popup` class
 Use the `Popup` class from `../../../../scripts/popup.js` for the queue editor instead of rolling our own modal. It handles z-index, focus trap, escape-to-cancel, and theme-correct styling automatically. `POPUP_TYPE.TEXT` for content-driven popups, `POPUP_RESULT` for return-value comparison. The convenience function `callGenericPopup(content, type, inputValue, popupOptions)` is fine for simple cases; reserve the `new Popup(...)` constructor for the queue editor where we need custom buttons and form state.
@@ -521,15 +526,15 @@ The extension is "done" when all of the following are true on a fresh ST install
 2. The Roulette panel appears in the Extensions drawer.
 3. A user with at least 2 connection profiles can create a queue, save it, and activate it on a chat.
 4. In **sequential** mode with fixed counts (e.g. A=3, B=2, C=4), generating 9 messages causes the active profile to be A for the first 3, B for the next 2, C for the next 4. Verified by checking the connection profile selector value before each generation.
-5. Swiping a message (regenerate-as-swipe) does not advance the counter — verified via the `type === 'swipe'` filter on `MESSAGE_RECEIVED`.
-6. Regenerating a message does not advance the counter — verified via the `type === 'regenerate'` filter on `MESSAGE_RECEIVED`.
+5. Swiping a message (regenerate-as-swipe) does not advance the counter — verified via the countable-type whitelist on `MESSAGE_RECEIVED`.
+6. Regenerating a message does not advance the counter, **with streaming on or off** — streaming regens carry `type === 'regenerate'`; non-streaming regens arrive coerced to `'normal'` and are caught by the `lastGenerationType` guard (see Hook points).
 7. In **weighted-random** mode with weights 1/1/1 and run length 1, profiles switch every message and over 100 messages each profile is used roughly evenly (within reasonable variance).
 8. With `noRepeatInRow: true`, no two consecutive responses ever come from the same profile (verified over 50+ messages).
 9. Switching chats preserves each chat's independent rotation state.
 10. Manually switching profiles mid-rotation pauses the rotation and surfaces the "Resume" affordance.
 11. Deleting a profile that's in an active queue triggers the error path: that slot is skipped, rotation continues with the remaining profiles.
 12. The pinned bar updates within one frame of any state change.
-13. All four slash commands (`/roulette-start`, `/roulette-stop`, `/roulette-status`, `/roulette-skip`) work and produce sensible output.
+13. All six slash commands (`/roulette-start`, `/roulette-stop`, `/roulette-status`, `/roulette-skip`, `/roulette-bind`, `/roulette-unbind`) work and produce sensible output; `/roulette-status` posts a visible system message (a bare command's return value is never displayed by ST).
 14. No console errors during normal use.
 15. The modal and bar render identically under any ST theme (they own their canvas); the drawer block follows the ST theme.
 

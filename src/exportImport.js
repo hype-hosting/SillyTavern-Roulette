@@ -82,7 +82,22 @@ function sanitiseImported(q) {
         id: uuid(),
         name: typeof q.name === 'string' && q.name.trim() ? q.name : 'Imported Queue',
         slots: Array.isArray(q.slots)
-            ? q.slots.map(s => ({ ...s, id: s.id || uuid() }))
+            // Slot ids are ALWAYS reissued: managed sampler presets are named
+            // by (queue name, profile, slot-id prefix), so re-importing an
+            // export of a queue that still exists locally would otherwise
+            // share preset names with it — edits in one queue would stomp the
+            // other's preset and deleting either would delete the shared one.
+            // Nothing can reference the old ids yet (the queue id is fresh
+            // too), so this is loss-free. tuning.presetName is a pointer to a
+            // preset on the EXPORTING install; drop it so cleanup here can
+            // never target a same-named local preset it doesn't own.
+            ? q.slots.map(s => ({
+                ...s,
+                id: uuid(),
+                tuning: s.tuning && typeof s.tuning === 'object'
+                    ? { ...s.tuning, presetName: null }
+                    : s.tuning,
+            }))
             : [],
     };
 }
