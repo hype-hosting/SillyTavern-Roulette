@@ -2,7 +2,7 @@
 
 A SillyTavern extension that rotates between connection profiles during roleplay — sequentially or by weighted random — so the user can mix models, parameters, and providers throughout a chat without manually switching.
 
-**Version:** 2.0.1
+**Version:** 2.0.2
 **License:** AGPL-3.0 (matches SillyTavern)
 **Target:** SillyTavern 1.12+ (uses Connection Manager / connection profiles API)
 **Repo name:** `SillyTavern-Roulette`
@@ -217,8 +217,15 @@ attach, and `render()` re-attaches if ST rebuilt the chrome underneath it.
 #### 7.3 Dot strip (`src/ui/dotStrip.js`)
 The whole visualisation. Plain DOM spans, no SVG. Three size variants —
 `bar`, `panel` (Rotation tab hero), `card` (queue-card thumbnails, static).
-Weighted-random mode scales dot diameter by √(weight/mean), clamped. Long
-queues window around the active slot with a "+N" chip. `mountDotStrip()`
+Weighted-random mode sizes each dot by weight ÷ mean weight, quantised to a
+five-rung ladder (`xs`…`xl`, exposed as `data-weight` and resolved to a
+per-variant pixel value in CSS). The rungs grow by area, so the ladder still
+reads as "twice the odds, twice the ink". **Every rung must stay a whole
+number of pixels**: browsers snap a box's painted edges to the device-pixel
+grid separately per axis, so a fractional diameter paints
+`round(x+w) − round(x)` wide but `round(y+h) − round(y)` tall — which is a
+visibly elliptical dot, and made equal weights render at unequal sizes
+(v2.0.2). Long queues window around the active slot with a "+N" chip. `mountDotStrip()`
 fingerprints the strip's shape and patches in place when only the active
 slot / counter / paused state changed, so CSS grow/shrink transitions are
 never restarted mid-flight. The active dot's numeral is near-black on the
@@ -377,7 +384,8 @@ SillyTavern-Roulette/
 │           ├── queues.js      # card grid + inline editor (replaces right pane)
 │           └── settings.js    # bar position/visibility + animation + accent colour
 ├── tests/
-│   └── rotation.test.mjs      # node --test over the pure core (no ST, no DOM, no mocks)
+│   ├── rotation.test.mjs      # node --test over the pure core (no ST, no DOM, no mocks)
+│   └── dotStrip.test.mjs      # weight→size ladder + the whole-pixel CSS invariant
 └── .gitignore
 ```
 
@@ -394,6 +402,11 @@ the generation-type filter, and the auto-activation precedence rules. Anything
 touching ST's event system or the DOM stays in `TESTING.md` as a manual walk.
 Keep `rotation.js` ST-free — that property is what makes this possible.
 
+`dotStrip.test.mjs` rides along on the same property: `dotStrip.js` touches the
+DOM only inside its render functions, so `weightSteps()` imports under plain
+node. It also greps `style.css` to assert every dot diameter is a whole number
+of pixels — the invariant that keeps the dots circular (see §7.3).
+
 `.github/workflows/test.yml` runs the same command on every pull request and
 on pushes to `main`. There is no install step because the extension has no
 dependencies — `node --test` is built into Node.
@@ -409,7 +422,7 @@ dependencies — `node --test` is built into Node.
   "js": "index.js",
   "css": "style.css",
   "author": "Hyperion Blackthorne",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "homePage": "https://github.com/hype-hosting/SillyTavern-Roulette",
   "auto_update": true,
   "hooks": { "activate": "init" }
@@ -512,8 +525,8 @@ pattern. Both surfaces render the rotation through `mountDotStrip()`
 (`src/ui/dotStrip.js`), which patches the existing DOM in place when only the
 active slot / counter / paused flag changed — rebuilding would restart the
 CSS grow/shrink transitions mid-flight. The strip's structural identity is a
-fingerprint of (variant, mode, slot ids + profiles + weights); any structural
-change rebuilds.
+fingerprint of (variant, mode, slot ids + profiles + weight rungs); any
+structural change rebuilds.
 
 Timing rule for CSS: durations are written `calc(<base> / var(--roulette-anim-scale))`
 — the user slider stores 0.25 (slow) to 2 (fast), so higher divides to faster.
@@ -561,6 +574,10 @@ Verified against `SillyTavern/SillyTavern@release` at commit `51ad27f` (Merge PR
 
 ## Version log
 
+- **v2.0.2** — weighted-random dots rendered as ellipses, and slots of equal
+  weight rendered at unequal sizes: the continuous `√(weight/mean)` scale
+  produced fractional pixel diameters, which browsers snap per-axis. Sizing
+  now steps through a whole-pixel ladder.
 - **v2.0.1** — post-release fixes from the review + storage-lifecycle audit:
   resume with an unresolvable profile counts as divergence; single error
   toast on failed starts/skips; nullish count fields prefill editor defaults;

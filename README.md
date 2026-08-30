@@ -175,7 +175,8 @@ Renaming or deleting a character updates or removes its binding automatically.
 
 | Version | Status | Notes |
 |---|---|---|
-| v2.0.1 | **Current** | Post-release polish — cleaner resume after manual overrides, single error toasts, editor prefill fixes, and self-healing cleanup of sampler-tuning presets when queues are renamed. |
+| v2.0.2 | **Current** | Weighted-random dots are drawn round again — equal weights now render at identical sizes, on every browser and display scaling. |
+| v2.0.1 | | Post-release polish — cleaner resume after manual overrides, single error toasts, editor prefill fixes, and self-healing cleanup of sampler-tuning presets when queues are renamed. |
 | v2.0 | | Full UI redesign — the revolver cylinder, floating widget, and chat-input pill are replaced by a linear dot strip and a slim pinned bar (position configurable). Cool near-black theme, denser modal, three tabs. |
 | v1.3 | | Per-character queue bindings — open a character's chat, their queue starts itself. |
 | v1.2 | | Inline sampler tuning per slot, overlaid through SillyTavern's preset system. |
