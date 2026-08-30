@@ -129,15 +129,31 @@
  * Dot strip — the visualisation
  * ============================================================
  *
- * Sizing is variant-scoped via --dot-size / --dot-gap; each dot can carry
- * a --dot-scale multiplier (weighted mode) and a --dot-color. The active
- * dot grows into a capsule holding the responses-remaining numeral.
+ * Sizing is variant-scoped via --dot-size / --dot-gap; each dot carries a
+ * --dot-color, and in weighted mode a data-weight step that re-points
+ * --dot-size at one rung of the variant's size ladder. The active dot grows
+ * into a capsule holding the responses-remaining numeral.
+ *
+ * Every rung is a WHOLE number of pixels, and that is load-bearing, not
+ * tidiness. Browsers snap a box's painted edges to the device-pixel grid
+ * separately in each axis, so a fractionally-sized dot paints
+ * round(x + w) − round(x) wide but round(y + h) − round(y) tall — different
+ * numbers whenever its x and y origins have different fractional parts. At
+ * these diameters that is a visibly squashed circle, and it made equal
+ * weights paint at unequal sizes. With w an integer, round(x + w) − round(x)
+ * is exactly w for any x, so the dot is round wherever it lands. Weighted
+ * sizing therefore steps through this ladder rather than multiplying by a
+ * continuous scale factor (see weightSteps() in src/ui/dotStrip.js).
  */
 
 .roulette-dots {
     display: flex;
     align-items: center;
     --dot-size: 9px;
+    --dot-size-xs: 6px;
+    --dot-size-sm: 7px;
+    --dot-size-lg: 11px;
+    --dot-size-xl: 13px;
     --dot-gap: 6px;
     --dot-active-size: 17px;
     --dot-font: 10px;
@@ -147,6 +163,10 @@
 
 .roulette-dots-panel {
     --dot-size: 15px;
+    --dot-size-xs: 10px;
+    --dot-size-sm: 12px;
+    --dot-size-lg: 18px;
+    --dot-size-xl: 22px;
     --dot-gap: 9px;
     --dot-active-size: 27px;
     --dot-font: 13px;
@@ -154,9 +174,20 @@
 
 .roulette-dots-card {
     --dot-size: 7px;
+    --dot-size-xs: 5px;
+    --dot-size-sm: 6px;
+    --dot-size-lg: 8px;
+    --dot-size-xl: 10px;
     --dot-gap: 4px;
     --dot-active-size: 7px;
 }
+
+/* Weighted-random: the odds ride in the dot diameters. 'md' is the default
+ * --dot-size above, so only the off-centre rungs need a rule. */
+.roulette-dot[data-weight="xs"] { --dot-size: var(--dot-size-xs); }
+.roulette-dot[data-weight="sm"] { --dot-size: var(--dot-size-sm); }
+.roulette-dot[data-weight="lg"] { --dot-size: var(--dot-size-lg); }
+.roulette-dot[data-weight="xl"] { --dot-size: var(--dot-size-xl); }
 
 .roulette-dot {
     position: relative;
@@ -164,9 +195,9 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    width: calc(var(--dot-size) * var(--dot-scale, 1));
-    height: calc(var(--dot-size) * var(--dot-scale, 1));
-    min-width: calc(var(--dot-size) * var(--dot-scale, 1));
+    width: var(--dot-size);
+    height: var(--dot-size);
+    min-width: var(--dot-size);
     border-radius: 999px;
     background: var(--dot-color, var(--roulette-text-dim));
     flex: none;

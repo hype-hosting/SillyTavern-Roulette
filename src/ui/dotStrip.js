@@ -20,6 +20,7 @@
  * Public API:
  *   mountDotStrip(host, opts)  — render or patch in place; returns the element
  *   describeStrip(opts)        — the screen-reader sentence, exported for reuse
+ *   weightSteps(slots, mode)   — weight → size rung; exported for tests
  */
 
 import { colorForProfile } from './profileColors.js';
@@ -44,14 +45,16 @@ const MAX_COUNT = 99;
  * @returns {HTMLElement} the strip element
  */
 export function mountDotStrip(host, opts) {
-    const win = windowFor(opts.slots ?? [], opts);
-    const key = stripKey(opts, win);
+    const slots = opts.slots ?? [];
+    const win = windowFor(slots, opts);
+    const steps = weightSteps(slots, opts.mode ?? 'sequential');
+    const key = stripKey(opts, win, steps);
     const existing = host.firstElementChild;
     if (existing && existing.dataset.stripKey === key) {
         patchStrip(existing, opts);
         return existing;
     }
-    const el = buildStrip(opts, win, key);
+    const el = buildStrip(opts, win, key, steps);
     host.replaceChildren(el);
     return el;
 }
@@ -66,10 +69,10 @@ export function mountDotStrip(host, opts) {
  * edge. A window shift means dots enter and leave, so that rebuild is
  * unavoidable anyway.
  */
-function stripKey(opts, win) {
+function stripKey(opts, win, steps) {
     const { slots = [], mode = 'sequential', variant = 'bar' } = opts;
     const shape = slots
-        .map(s => `${s.id}:${s.profileName ?? ''}:${mode === 'weighted-random' ? (s.weight ?? 1) : ''}`)
+        .map((s, i) => `${s.id}:${s.profileName ?? ''}:${steps[i]}`)
         .join('|');
     return `${variant}/${mode}/${shape}@${win.from}-${win.to}`;
 }
@@ -86,10 +89,9 @@ function stripKey(opts, win) {
  * @param {boolean} opts.idle                no rotation running — dots render hollow
  * @returns {HTMLElement}
  */
-function buildStrip(opts, win, key) {
+function buildStrip(opts, win, key, steps) {
     const {
         slots = [],
-        mode = 'sequential',
         variant = 'bar',
     } = opts;
 
@@ -108,18 +110,11 @@ function buildStrip(opts, win, key) {
         return strip;
     }
 
-    // Weighted mode carries the odds in the dot sizes, the way the cylinder
-    // carried them in chamber radii. sqrt so the visual *area* tracks the
-    // weight ratio rather than the diameter.
-    const weightScale = mode === 'weighted-random'
-        ? buildWeightScaler(slots)
-        : () => 1;
-
     const { from, to, cutStart, cutEnd } = win;
 
     if (cutStart) strip.appendChild(buildEllipsis(from));
     for (let i = from; i < to; i++) {
-        strip.appendChild(buildDot(slots[i], i, weightScale(slots[i]), opts));
+        strip.appendChild(buildDot(slots[i], i, steps[i], opts));
     }
     if (cutEnd) strip.appendChild(buildEllipsis(slots.length - to));
 
@@ -157,21 +152,58 @@ function buildEllipsis(count) {
 }
 
 /**
- * Map a slot to a size multiplier from its weight, normalised so the average
- * weight renders at 1×. Clamped hard: a 50:1 weight ratio is meaningful as a
- * number but unreadable as a 7× dot.
+ * The five size steps a weighted dot can take, as CSS keywords. Each maps to
+ * a whole-pixel diameter per variant in style.css, growing by area so the
+ * ladder still reads as "twice the odds, twice the ink".
  */
-function buildWeightScaler(slots) {
+const WEIGHT_LADDER = ['xs', 'sm', 'md', 'lg', 'xl'];
+
+/** Upper bound (exclusive) on weight÷mean for each step below the largest. */
+const WEIGHT_BREAKS = [0.55, 0.8, 1.25, 1.8];
+
+/** The step every dot gets outside weighted-random mode. */
+const NEUTRAL_STEP = 'md';
+
+/**
+ * Map each slot to a size step from its weight relative to the queue's mean.
+ *
+ * Discrete on purpose. This used to be a continuous multiplier —
+ * sqrt(weight/mean), clamped — written into a `--dot-scale` custom property
+ * and multiplied against the variant's base size in CSS. That produced
+ * fractional diameters (9px × 0.844 = 7.594px), and a fractionally-sized box
+ * gets snapped to the device-pixel grid *independently* in x and y: painted
+ * width is round(x + w) − round(x), painted height round(y + h) − round(y),
+ * and those disagree whenever the dot's x and y origins have different
+ * fractional parts. At 7–15px a one-pixel disagreement is a visibly squashed
+ * circle, and two slots of equal weight could land on different snappings and
+ * paint at different sizes — both of which users reported.
+ *
+ * Whole-pixel diameters fix both: round(x + w) − round(x) === w exactly when
+ * w is an integer, whatever x is. So the ladder is quantised here and the
+ * pixel values live in CSS, one per variant per step.
+ *
+ * The lost granularity costs nothing real — a 4% diameter difference on a
+ * 9px dot was never perceptible, it just made the snapping look arbitrary.
+ *
+ * @param {Array<{weight?: number}>} slots
+ * @param {string} mode
+ * @returns {string[]} one step keyword per slot, parallel to `slots`
+ */
+export function weightSteps(slots, mode) {
+    if (mode !== 'weighted-random' || slots.length === 0) {
+        return slots.map(() => NEUTRAL_STEP);
+    }
     const weights = slots.map(s => Math.max(0.05, Number(s.weight ?? 1)));
     const mean = weights.reduce((a, b) => a + b, 0) / weights.length;
-    return (slot) => {
-        const w = Math.max(0.05, Number(slot.weight ?? 1));
-        const ratio = mean > 0 ? w / mean : 1;
-        return Math.sqrt(Math.max(0.45, Math.min(2.2, ratio)));
-    };
+    if (!(mean > 0)) return slots.map(() => NEUTRAL_STEP);
+    return weights.map(w => {
+        const ratio = w / mean;
+        const i = WEIGHT_BREAKS.findIndex(bound => ratio < bound);
+        return WEIGHT_LADDER[i === -1 ? WEIGHT_LADDER.length - 1 : i];
+    });
 }
 
-function buildDot(slot, index, scale, opts) {
+function buildDot(slot, index, step, opts) {
     const dot = document.createElement('span');
     dot.className = 'roulette-dot';
     dot.dataset.slotId = slot.id;
@@ -185,7 +217,7 @@ function buildDot(slot, index, scale, opts) {
         dot.style.setProperty('--dot-color', colorForProfile(slot.profileName));
         dot.title = slot.profileName;
     }
-    if (scale !== 1) dot.style.setProperty('--dot-scale', scale.toFixed(3));
+    if (step !== NEUTRAL_STEP) dot.dataset.weight = step;
 
     // The numeral node exists on every dot, empty until the dot goes active.
     // Creating it up front means patchStrip() only ever sets textContent —

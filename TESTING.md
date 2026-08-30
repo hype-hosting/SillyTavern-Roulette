@@ -66,6 +66,23 @@ Continuing from C3.
 
 **Pass:** Across 100 picks, no profile is conspicuously over- or under-represented. (For a precise test, run the offline math sanity script in this repo's history — it confirms 33.3% ± 0.2pp over 100k.)
 
+## Criterion 7a — Weighted dots are round and consistently sized
+
+Regression check for the v2.0.2 fix. Fractional dot diameters used to be
+snapped to the device-pixel grid separately in each axis, drawing ellipses and
+giving equal-weight slots different sizes.
+
+1. Create a queue with five slots, weights `2, 2, 1, 1, 1`. Save.
+2. Look at the bar's idle dots, the Rotation tab's larger strip, and the queue
+   card's thumbnail.
+3. Repeat at browser zoom 90%, 100%, 110% and 125% (`Ctrl` + `+` / `-`), and if
+   you have a HiDPI or fractionally-scaled display, on that too.
+
+**Pass:** At every zoom and on every surface, each dot is circular — not an
+oval — and the two weight-`2` dots are the same size as each other, as are the
+three weight-`1` dots. The weight-`2` dots are visibly larger than the
+weight-`1` dots.
+
 ## Criterion 8 — `noRepeatInRow` holds
 
 1. Edit `wr-test`: enable **Don't repeat the same profile twice in a row**. Save. Restart rotation.
@@ -225,6 +242,12 @@ pure core: slot sequencing, `noRepeatInRow`, weighted distribution, the
 generation-type filter, and the binding auto-activation precedence rules.
 It replaces hand-walking criteria 4, 7, 8 and the rule-checks in 17 — the
 criteria above remain the manual check that the wiring around them is right.
+
+`tests/dotStrip.test.mjs` covers the weight → dot-size ladder, including the
+rule that every dot diameter in `style.css` is a whole number of pixels. That
+one is load-bearing: fractional diameters get snapped to the device-pixel grid
+separately per axis, which draws the dots as ellipses and makes equal weights
+look unequal.
 
 This runs automatically on GitHub for every pull request (see
 `.github/workflows/test.yml`), so a red cross on a PR means the scheduling
